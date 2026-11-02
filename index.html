@@ -342,6 +342,7 @@ textarea.inp{height:auto;padding:10px 12px;min-height:48px;resize:vertical}
     <div class="small muted" id="rangeLbl"></div>
     <div class="kpis" id="kpis"></div>
     <div class="panel chart"><h3 id="chartTitle" style="margin-bottom:12px">Günlük ciro</h3><div id="chart"></div></div>
+    <div class="panel"><div class="ph"><h3>Satışlar</h3><span class="small muted" id="salesCnt"></span></div><div class="list" id="salesList"></div></div>
     <div class="two">
       <div class="panel"><div class="ph"><h3>En çok ciro yapan ürünler</h3></div><div id="topProd"></div></div>
       <div class="panel"><div class="ph"><h3>Kategoriye göre</h3></div><div id="topKat"></div></div>
@@ -678,6 +679,10 @@ function renderCiro() {
   for (const m of sales) { const t = m.adet * m.birimFiyat; byP.set(m.urunId, (byP.get(m.urunId) || 0) + t); const k = S.products.get(m.urunId)?.kategori || "Diğer"; byK.set(k, (byK.get(k) || 0) + t); }
   const bars = (map, nameFn) => { const arr = [...map.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6); const max = arr[0]?.[1] || 1;
     return arr.length ? arr.map(([k, v]) => `<div class="bar-row"><b>${esc(nameFn(k))}</b><span class="num">${tl(v)}</span><span class="track"><i style="width:${Math.max(2, v / max * 100)}%"></i></span></div>`).join("") : `<div class="empty small">Bu aralıkta satış yok.</div>`; };
+  const sorted = sales.slice().sort((x, y) => y.tarih.localeCompare(x.tarih) || y.ts - x.ts);
+  $("#salesCnt").textContent = `${sales.length} satış · ${tl(ciro)}`;
+  $("#salesList").innerHTML = sorted.length ? sorted.map(m => moveRow(m)).join("") : `<div class="empty small">Bu aralıkta satış yok.</div>`;
+  bindMoveButtons($("#salesList"), renderCiro);
   $("#topProd").innerHTML = bars(byP, pname);
   $("#topKat").innerHTML = bars(byK, k => k);
 }
