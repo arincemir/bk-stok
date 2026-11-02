@@ -11,8 +11,8 @@
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#181C22" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-180.png">
-<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png?v=2">
+<link rel="icon" href="icon-192.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
@@ -220,12 +220,14 @@ textarea.inp{height:auto;padding:10px 12px;min-height:48px;resize:vertical}
 .toast{--tx:-50%}
 .login{min-height:80vh;display:flex;align-items:center;justify-content:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .login .panel{width:100%;max-width:380px;padding:24px;display:flex;flex-direction:column;gap:14px}
-.login .brand{font-size:30px}
+.login .logo-login{width:100%;height:auto;border-radius:8px}
+.logo{height:34px;width:auto;display:block;border-radius:6px;flex:none}
+@media (max-width:420px){.logo{height:28px}}
 </style>
 </head>
 <body>
 <div id="loginView" class="login" hidden><form class="panel" id="loginForm">
-  <div class="brand">BK <span>Stok</span></div>
+  <img class="logo-login" src="logo-wide.png" alt="BK Car Parts" width="478" height="96">
   <div class="small muted" id="loginSub">Hesabınla giriş yap.</div>
   <div class="field"><label for="le">E-posta</label><input id="le" class="inp" type="email" autocomplete="username" required></div>
   <div class="field"><label for="lp">Şifre</label><input id="lp" class="inp" type="password" autocomplete="current-password" minlength="6" required></div>
@@ -236,7 +238,7 @@ textarea.inp{height:auto;padding:10px 12px;min-height:48px;resize:vertical}
 <div id="appView" hidden>
 
 <header class="top"><div class="top-in">
-  <div class="brand">BK <span>Stok</span></div>
+  <img class="logo" src="logo-wide.png" alt="BK Car Parts" width="478" height="96">
   <nav class="tabs-top" aria-label="Ekranlar">
     <button data-go="hareket">Stok gir / düş</button>
     <button data-go="stok">Ürünler</button>
