@@ -1,0 +1,13 @@
+{
+  "name": "BK Stok",
+  "short_name": "BK Stok",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EEF0F2",
+  "theme_color": "#15191E",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

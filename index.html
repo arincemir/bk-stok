@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BK Stok</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BK Stok">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#181C22" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: app shell — header + 3 ekran (Hareket / Stok / Ciro); mobilde alt sekme çubuğu, masaüstünde üst sekmeler */
+:root{
+  --bg:#EEF0F2; --surface:#FFFFFF; --sunk:#E3E6EA; --line:#D3D8DE;
+  --ink:#15191E; --muted:#5D6672; --accent:#1F4E8C; --accent-ink:#FFFFFF;
+  --in:#167A4A; --in-soft:#DCF0E5; --out:#B54A12; --out-soft:#F8E4D6;
+  --warn:#946200; --warn-soft:#FBEFC9; --bad:#B42318; --bad-soft:#FBE1DE;
+  --f-ui:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-disp:"Barlow Condensed","Barlow",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r:10px; --tabh:64px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1216; --surface:#181C22; --sunk:#11151A; --line:#2A3038;
+  --ink:#E8EBEF; --muted:#97A1AD; --accent:#6EA2E6; --accent-ink:#0B1420;
+  --in:#4CC48A; --in-soft:#14301F; --out:#F0884E; --out-soft:#3A2214;
+  --warn:#E7B54A; --warn-soft:#352A0E; --bad:#F2796E; --bad-soft:#3A1715; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1216; --surface:#181C22; --sunk:#11151A; --line:#2A3038;
+  --ink:#E8EBEF; --muted:#97A1AD; --accent:#6EA2E6; --accent-ink:#0B1420;
+  --in:#4CC48A; --in-soft:#14301F; --out:#F0884E; --out-soft:#3A2214;
+  --warn:#E7B54A; --warn-soft:#352A0E; --bad:#F2796E; --bad-soft:#3A1715; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top-in{max-width:1120px;margin:0 auto;display:flex;align-items:center;gap:16px;height:56px}
+.brand{font-family:var(--f-disp);font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.brand span{color:var(--muted);font-weight:600}
+.sync{margin-left:auto;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.sync.ok .dot{background:var(--in)} .sync.err .dot{background:var(--bad)}
+.tabs-top{display:none;gap:4px}
+.tabs-top button{border:0;background:none;padding:8px 14px;border-radius:8px;font-weight:600;color:var(--muted)}
+.tabs-top button[aria-current="page"]{background:var(--sunk);color:var(--ink)}
+
+/* bottom tabs (mobile) */
+.tabs-bot{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(3,1fr);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs-bot button{border:0;background:none;height:var(--tabh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted)}
+.tabs-bot button svg{width:24px;height:24px}
+.tabs-bot button[aria-current="page"]{color:var(--accent)}
+
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px calc(var(--tabh) + 24px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:1120px;margin:0 auto}
+@media (min-width:860px){
+  .tabs-top{display:flex}.tabs-bot{display:none}
+  main{padding-block:24px 48px}
+}
+
+h2{font-family:var(--f-disp);font-weight:700;font-size:26px;letter-spacing:.02em;margin:0;text-transform:uppercase;text-wrap:balance}
+h3{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+
+/* form */
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>label,.lbl{font-size:13px;font-weight:600;color:var(--muted)}
+.inp{width:100%;height:48px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0 12px;font-size:17px;min-width:0}
+textarea.inp{height:auto;padding:10px 12px;min-height:48px;resize:vertical}
+.inp:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{height:48px;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:0 16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.in{background:var(--in);border-color:var(--in);color:#fff}
+.btn.out{background:var(--out);border-color:var(--out);color:#fff}
+.btn.ghost{border-color:transparent;background:none}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{height:36px;padding:0 12px;font-size:14px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.block{width:100%;height:56px;font-size:18px}
+
+/* hareket screen */
+.mv{display:grid;gap:20px}
+@media (min-width:860px){.mv{grid-template-columns:minmax(0,440px) minmax(0,1fr);align-items:start}}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--sunk);border-radius:10px;padding:4px;gap:4px}
+.seg button{height:52px;border:0;border-radius:7px;background:none;font-family:var(--f-disp);font-size:20px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px}
+.seg button[aria-pressed="true"][data-t="giris"]{background:var(--in);color:#fff}
+.seg button[aria-pressed="true"][data-t="cikis"]{background:var(--out);color:#fff}
+.form{padding:16px;display:flex;flex-direction:column;gap:14px}
+.pick{position:relative}
+.sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:15;background:var(--surface);border:1px solid var(--line);border-radius:8px;max-height:300px;overflow:auto;box-shadow:0 10px 30px rgb(0 0 0 / .15)}
+.sugg button{display:flex;width:100%;text-align:left;border:0;background:none;padding:12px;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
+.sugg button:last-child{border-bottom:0}
+.sugg button:hover,.sugg button.hl{background:var(--sunk)}
+.sugg .nm{flex:1;min-width:0}
+.sugg .nm b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg .new b{color:var(--accent)}
+.chosen{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 8px 8px 12px;background:var(--sunk);min-height:48px}
+.chosen .nm{flex:1;min-width:0}
+.chosen .nm b{display:block;font-weight:600}
+.stepper{display:grid;grid-template-columns:56px 1fr 56px;gap:8px}
+.stepper button{height:56px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:26px;font-weight:600}
+.stepper input{height:56px;text-align:center;font-size:24px;font-family:var(--f-num);border:1px solid var(--line);border-radius:8px;background:var(--surface);min-width:0;width:100%}
+.mode{display:inline-flex;background:var(--sunk);border-radius:7px;padding:3px;gap:2px}
+.mode button{border:0;background:none;border-radius:5px;padding:4px 10px;font-size:13px;font-weight:600;color:var(--muted)}
+.mode button[aria-pressed="true"]{background:var(--surface);color:var(--ink)}
+.money{position:relative}
+.money .inp{padding-right:36px;font-family:var(--f-num);font-size:20px}
+.money::after{content:"₺";position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px;border-radius:8px;background:var(--sunk)}
+.total .num{font-size:22px;font-weight:600}
+.note{font-size:13px;padding:8px 10px;border-radius:8px}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+.newp{border:1px dashed var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+
+/* list */
+.list{display:flex;flex-direction:column}
+.li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.li:first-child{border-top:0}
+.pill{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:3px 8px;white-space:nowrap}
+.pill.in{background:var(--in-soft);color:var(--in)}
+.pill.out{background:var(--out-soft);color:var(--out)}
+.pill.adj{background:var(--sunk);color:var(--muted)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.ok{background:var(--in-soft);color:var(--in)}
+.li .t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .t span{font-size:13px;color:var(--muted)}
+.li .r{text-align:right}
+.li .r b{display:block;font-family:var(--f-num);font-weight:600}
+.li .r .x{display:flex;gap:4px;justify-content:flex-end;margin-top:4px}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.empty{padding:32px 20px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+
+/* stok screen */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.toolbar .inp{flex:1 1 220px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;white-space:nowrap;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.prod{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 16px;border-top:1px solid var(--line);width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0}
+.prod:first-child{border-top:0}
+.prod:hover{background:var(--sunk)}
+.prod b{display:block;font-weight:600}
+.prod .meta{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qty{display:flex;align-items:center;gap:10px}
+.qty .n{font-family:var(--f-num);font-size:24px;font-weight:600;min-width:2ch;text-align:right}
+.sumbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.sumbar div{background:var(--surface);padding:12px 14px}
+.sumbar b{display:block;font-family:var(--f-num);font-size:22px;font-weight:600}
+.sumbar span{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+
+/* sheet (product detail) */
+.scrim{position:fixed;inset:0;z-index:40;background:rgb(0 0 0 / .45);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;
+  padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px}
+@media (min-width:860px){.scrim{align-items:center}.sheet{border-radius:16px}}
+.sheet-h{display:flex;align-items:flex-start;gap:12px}
+.sheet-h h2{flex:1;font-size:24px;text-transform:none}
+.bigq{display:flex;align-items:baseline;gap:8px}
+.bigq .num{font-size:44px;font-weight:600;line-height:1}
+
+/* ciro */
+.periods{display:flex;gap:6px;flex-wrap:wrap}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:860px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.kpi{padding:14px 16px}
+.kpi span{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.kpi b{display:block;font-family:var(--f-num);font-size:clamp(20px,5vw,28px);font-weight:600;margin-top:4px;overflow-wrap:anywhere}
+.kpi small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.kpi.lead{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.kpi.lead span,.kpi.lead small{color:var(--accent-ink);opacity:.8}
+.chart{padding:16px;overflow-x:auto}
+.chart svg{display:block;width:100%;min-width:520px;height:auto}
+.two{display:grid;gap:16px}
+@media (min-width:860px){.two{grid-template-columns:1fr 1fr}}
+.bar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 16px;border-top:1px solid var(--line)}
+.bar-row:first-child{border-top:0}
+.bar-row .track{grid-column:1/-1;height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.bar-row .track i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.bar-row b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.custom{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.custom .inp{width:auto;flex:1 1 140px;height:40px;font-size:15px}
+
+/* toast */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + 16px + env(safe-area-inset-bottom,0px));z-index:50;
+  background:var(--ink);color:var(--bg);border-radius:10px;padding:12px 14px 12px 16px;display:flex;gap:14px;align-items:center;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgb(0 0 0 / .25)}
+.toast button{border:0;background:none;color:var(--bg);font-weight:700;text-decoration:underline;padding:4px}
+@media (min-width:860px){.toast{bottom:24px}}
+.banner{padding:12px 16px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn);font-size:14px}
+@media (prefers-reduced-motion:no-preference){.toast,.sheet{animation:up .18s ease-out}}
+@keyframes up{from{transform:translate(var(--tx,0),12px);opacity:0}}
+.toast{--tx:-50%}
+.login{min-height:80vh;display:flex;align-items:center;justify-content:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.login .panel{width:100%;max-width:380px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.login .brand{font-size:30px}
+</style>
+</head>
+<body>
+<div id="loginView" class="login" hidden><form class="panel" id="loginForm">
+  <div class="brand">BK <span>Stok</span></div>
+  <div class="small muted" id="loginSub">Hesabınla giriş yap.</div>
+  <div class="field"><label for="le">E-posta</label><input id="le" class="inp" type="email" autocomplete="username" required></div>
+  <div class="field"><label for="lp">Şifre</label><input id="lp" class="inp" type="password" autocomplete="current-password" minlength="6" required></div>
+  <div id="loginMsg" class="note bad" hidden></div>
+  <button class="btn block primary" id="loginBtn" type="submit">Giriş yap</button>
+  <button class="btn ghost sm" id="loginMode" type="button">İlk kez mi? Hesap oluştur</button>
+</form></div>
+<div id="appView" hidden>
+
+<header class="top"><div class="top-in">
+  <div class="brand">BK <span>Stok</span></div>
+  <nav class="tabs-top" aria-label="Ekranlar">
+    <button data-go="hareket">Stok gir / düş</button>
+    <button data-go="stok">Ürünler</button>
+    <button data-go="ciro">Ciro</button>
+  </nav>
+  <div class="sync" id="sync"><i class="dot"></i><span>Bağlanıyor…</span></div>
+  <button class="btn ghost sm" id="logout" title="Çıkış yap">Çıkış</button>
+</div></header>
+
+<main><div class="wrap">
+  <div id="banner" class="banner" hidden></div>
+
+  <!-- HAREKET -->
+  <section id="v-hareket" class="stack">
+    <div class="mv">
+      <div class="panel">
+        <div class="form">
+          <div class="seg" role="group" aria-label="İşlem tipi">
+            <button data-t="giris" aria-pressed="true">＋ Stok gir</button>
+            <button data-t="cikis" aria-pressed="false">− Stok düş</button>
+          </div>
+
+          <div class="field">
+            <label for="q">Ürün</label>
+            <div id="pickWrap" class="pick">
+              <input id="q" class="inp" autocomplete="off" placeholder="Ürün adı yaz: G20 lip, 360 kamera…">
+              <div id="sugg" class="sugg" hidden></div>
+            </div>
+            <div id="chosen" class="chosen" hidden></div>
+          </div>
+
+          <div id="newp" class="newp" hidden>
+            <div class="small muted">Yeni ürün olarak kaydedilecek</div>
+            <div class="grid2">
+              <div class="field"><label for="np-kat">Kategori</label><select id="np-kat" class="inp"></select></div>
+              <div class="field"><label for="np-kasa">Kasa</label><input id="np-kasa" class="inp" placeholder="G20, G30…"></div>
+            </div>
+            <div class="field"><label for="np-konum">Raf / konum <span class="muted">(opsiyonel)</span></label><input id="np-konum" class="inp" placeholder="A3, depo üst raf…"></div>
+          </div>
+
+          <div class="field">
+            <span class="lbl">Adet</span>
+            <div class="stepper">
+              <button type="button" id="minus" aria-label="Azalt">−</button>
+              <input id="adet" type="number" inputmode="numeric" min="1" step="1" value="1" aria-label="Adet">
+              <button type="button" id="plus" aria-label="Artır">+</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="row" style="justify-content:space-between">
+              <label for="fiyat" id="fiyatLbl">Birim alış fiyatı</label>
+              <div class="mode" role="group" aria-label="Fiyat tipi">
+                <button data-m="birim" aria-pressed="true">Birim</button>
+                <button data-m="toplam" aria-pressed="false">Toplam</button>
+              </div>
+            </div>
+            <div class="money"><input id="fiyat" class="inp" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></div>
+            <div id="fiyatHint" class="small muted">Boş bırakabilirsin. Doldurursan kâr hesaplanır.</div>
+          </div>
+
+          <div id="totalBox" class="total" hidden><span class="muted">Toplam</span><span class="num" id="totalVal">0 ₺</span></div>
+
+          <div class="grid2">
+            <div class="field"><label for="tarih">Tarih</label><input id="tarih" class="inp" type="date"></div>
+            <div class="field"><label for="not">Not <span class="muted">(ops.)</span></label><input id="not" class="inp" placeholder="Müşteri, plaka…"></div>
+          </div>
+
+          <div id="formMsg" class="note" hidden></div>
+          <button id="save" class="btn block in">Stoğa ekle</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h3>Son hareketler</h3><span class="small muted" id="todaySum"></span></div>
+        <div id="recent" class="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STOK -->
+  <section id="v-stok" class="stack" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Ürünler</h2><button class="btn primary sm" id="addProd">＋ Yeni ürün</button></div>
+    <div class="sumbar">
+      <div><b class="num" id="s-cesit">0</b><span>Ürün çeşidi</span></div>
+      <div><b class="num" id="s-adet">0</b><span>Toplam adet</span></div>
+      <div><b class="num" id="s-az">0</b><span>Az / bitti</span></div>
+    </div>
+    <div class="toolbar"><input id="search" class="inp" placeholder="Ara: ad, kasa, raf…" type="search"></div>
+    <div class="chips" id="katChips"></div>
+    <div class="panel"><div id="prodList" class="list"></div></div>
+  </section>
+
+  <!-- CİRO -->
+  <section id="v-ciro" class="stack" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Ciro</h2><button class="btn sm" id="csv">Excel'e aktar (CSV)</button></div>
+    <div class="periods" id="periods"></div>
+    <div class="custom" id="customBox" hidden>
+      <input id="from" class="inp" type="date" aria-label="Başlangıç"><span class="muted">→</span><input id="to" class="inp" type="date" aria-label="Bitiş">
+    </div>
+    <div class="small muted" id="rangeLbl"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="panel chart"><h3 id="chartTitle" style="margin-bottom:12px">Günlük ciro</h3><div id="chart"></div></div>
+    <div class="two">
+      <div class="panel"><div class="ph"><h3>En çok ciro yapan ürünler</h3></div><div id="topProd"></div></div>
+      <div class="panel"><div class="ph"><h3>Kategoriye göre</h3></div><div id="topKat"></div></div>
+    </div>
+  </section>
+</div></main>
+
+<nav class="tabs-bot" aria-label="Ekranlar">
+  <button data-go="hareket"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg>Gir / Düş</button>
+  <button data-go="stok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Ürünler</button>
+  <button data-go="ciro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Ciro</button>
+</nav>
+
+</div>
+<div id="sheetHost"></div>
+<div id="toastHost"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+(() => {
+const KATS = ["Aero (lip, marşpiyel, difüzör)", "Spoiler", "Karbon", "Panjur", "Aydınlatma (DRL, stop)", "İç mekan", "Direksiyon / paddle", "Elektronik (kamera vb.)", "Diğer"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const TL = new Intl.NumberFormat("tr-TR", {maximumFractionDigits: 2});
+const tl = n => TL.format(Math.round((n || 0) * 100) / 100) + " ₺";
+const tlShort = n => n >= 1e6 ? TL.format(Math.round(n / 1e5) / 10) + " M" : n >= 1e3 ? TL.format(Math.round(n / 100) / 10) + " B" : TL.format(Math.round(n));
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const today = () => iso(new Date());
+const parseISO = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const fmtDate = s => { const d = parseISO(s); return d.toLocaleDateString("tr-TR", {day: "numeric", month: "short"}); };
+const parseMoney = s => { s = String(s || "").trim().replace(/\s|₺/g, ""); if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = Number(s); return isFinite(n) && n >= 0 ? n : NaN; };
+const norm = s => String(s || "").toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ı/g, "i");
+
+const sb = supabase.createClient(window.BK_CONFIG.url, window.BK_CONFIG.anonKey, {auth: {persistSession: true, autoRefreshToken: true}});
+let db = null, me = null;
+const toMove = r => ({id: r.id, urunId: r.urun_id, urunAd: r.urun_ad, tip: r.tip, adet: Number(r.adet) || 0, birimFiyat: Number(r.birim_fiyat) || 0, tarih: r.tarih, not: r.not_metni || "", ts: Number(r.ts) || 0, kim: r.kullanici || ""});
+const api = {
+  async addProduct(d) { const {data, error} = await sb.from("urunler").insert(d).select("id").single(); if (error) throw error; return data.id; },
+  async updateProduct(id, d) { const {error} = await sb.from("urunler").update(d).eq("id", id); if (error) throw error; },
+  async deleteProduct(id) { const {error} = await sb.from("urunler").delete().eq("id", id); if (error) throw error; },
+  async addMove(m) { const {data, error} = await sb.from("hareketler").insert({urun_id: m.urunId, urun_ad: m.urunAd, tip: m.tip, adet: m.adet, birim_fiyat: m.birimFiyat, tarih: m.tarih, not_metni: m.not, ts: m.ts}).select("id").single(); if (error) throw error; return data.id; },
+  async deleteMove(id) { const {error} = await sb.from("hareketler").delete().eq("id", id); if (error) throw error; },
+};
+const S = { products: new Map(), moves: [], loaded: {p: false, m: false}, readOnly: false };
+const F = { tip: "giris", prod: null, newName: "", mode: "birim", hl: -1 };
+let view = "hareket";
+
+/* ---------- derived ---------- */
+function stockOf(id) { let n = 0; for (const m of S.moves) if (m.urunId === id) n += m.tip === "giris" ? m.adet : m.tip === "cikis" ? -m.adet : m.adet; return n; }
+function stocks() { const map = new Map(); for (const m of S.moves) { const d = m.tip === "cikis" ? -m.adet : m.adet; map.set(m.urunId, (map.get(m.urunId) || 0) + d); } return map; }
+function avgCosts() { const a = new Map(); for (const m of S.moves) if (m.tip === "giris" && m.birimFiyat > 0) { const o = a.get(m.urunId) || {q: 0, t: 0}; o.q += m.adet; o.t += m.adet * m.birimFiyat; a.set(m.urunId, o); }
+  const r = new Map(); a.forEach((o, k) => r.set(k, o.t / o.q)); return r; }
+const pname = id => S.products.get(id)?.ad || "(silinmiş ürün)";
+function stockState(n, min) { if (n <= 0) return ["bad", "Yok"]; if (n <= (min || 1)) return ["warn", "Az"]; return ["ok", "Var"]; }
+
+/* ---------- views ---------- */
+function go(v) {
+  view = v;
+  for (const id of ["hareket", "stok", "ciro"]) $("#v-" + id).hidden = id !== v;
+  document.querySelectorAll("[data-go]").forEach(b => b.toggleAttribute("aria-current", false) || (b.dataset.go === v && b.setAttribute("aria-current", "page")));
+  try { localStorage.setItem("bk-view", v); } catch (e) {}
+  if (location.hash.slice(1) !== v) history.replaceState(null, "", "#" + v);
+  render();
+}
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (["hareket","stok","ciro"].includes(h) && h !== view) go(h); });
+
+function render() { renderForm(); renderRecent(); if (view === "stok") renderStock(); if (view === "ciro") renderCiro(); }
+
+/* ---------- hareket form ---------- */
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { F.tip = b.dataset.t; if (F.tip === "cikis" && !F.prod) { F.newName = ""; } renderForm(); });
+document.querySelectorAll(".mode button").forEach(b => b.onclick = () => { F.mode = b.dataset.m; renderForm(); });
+$("#minus").onclick = () => { $("#adet").value = Math.max(1, (parseInt($("#adet").value) || 1) - 1); renderForm(); };
+$("#plus").onclick = () => { $("#adet").value = (parseInt($("#adet").value) || 0) + 1; renderForm(); };
+$("#adet").oninput = $("#fiyat").oninput = () => renderForm();
+$("#tarih").value = today();
+$("#np-kat").innerHTML = KATS.map(k => `<option>${esc(k)}</option>`).join("");
+
+const q = $("#q");
+q.oninput = () => { F.hl = -1; showSugg(); };
+q.onfocus = () => showSugg();
+q.onkeydown = e => {
+  const items = [...$("#sugg").querySelectorAll("button")];
+  if (e.key === "ArrowDown") { F.hl = Math.min(items.length - 1, F.hl + 1); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { F.hl = Math.max(0, F.hl - 1); e.preventDefault(); }
+  else if (e.key === "Enter") { (items[F.hl] || items[0])?.click(); e.preventDefault(); return; }
+  else if (e.key === "Escape") { $("#sugg").hidden = true; return; }
+  items.forEach((b, i) => b.classList.toggle("hl", i === F.hl));
+};
+document.addEventListener("pointerdown", e => { if (!$("#pickWrap").contains(e.target)) $("#sugg").hidden = true; });
+
+function matchProducts(text) {
+  const t = norm(text).split(/\s+/).filter(Boolean);
+  const st = stocks();
+  return [...S.products.entries()].map(([id, p]) => ({id, p, n: st.get(id) || 0}))
+    .filter(({p}) => { const h = norm([p.ad, p.kasa, p.kategori, p.konum].join(" ")); return t.every(w => h.includes(w)); })
+    .sort((a, b) => a.p.ad.localeCompare(b.p.ad, "tr"));
+}
+function showSugg() {
+  const box = $("#sugg"), text = q.value.trim();
+  const list = matchProducts(text).slice(0, 8);
+  let html = list.map(({id, p, n}) => `<button type="button" data-id="${esc(id)}"><span class="nm"><b>${esc(p.ad)}</b><span class="small muted">${esc([p.kasa, p.konum].filter(Boolean).join(" · ") || p.kategori || "")}</span></span><span class="pill ${stockState(n, p.min)[0]} num">${n}</span></button>`).join("");
+  const exact = [...S.products.values()].some(p => norm(p.ad) === norm(text));
+  if (text && !exact && F.tip === "giris") html += `<button type="button" class="new" data-new="1"><span class="nm"><b>＋ “${esc(text)}” yeni ürün olarak ekle</b></span></button>`;
+  if (!html) html = `<div class="empty small">${S.products.size ? "Eşleşen ürün yok." : "Henüz ürün yok. Önce <b>Stok gir</b> ile ürün adını yazıp ekle."}</div>`;
+  box.innerHTML = html; box.hidden = !text && !S.products.size ? true : false;
+  if (!text && S.products.size === 0) box.hidden = true;
+  box.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if (b.dataset.new) { F.prod = null; F.newName = text; } else { F.prod = b.dataset.id; F.newName = ""; }
+    q.value = ""; box.hidden = true; renderForm();
+    setTimeout(() => $("#adet").focus(), 0);
+  });
+}
+function clearPick() { F.prod = null; F.newName = ""; renderForm(); q.focus(); }
+
+function formNumbers() {
+  const adet = parseInt($("#adet").value) || 0;
+  const raw = parseMoney($("#fiyat").value);
+  let birim = null, toplam = null;
+  if (raw !== null && !isNaN(raw)) { if (F.mode === "birim") { birim = raw; toplam = raw * adet; } else { toplam = raw; birim = adet ? raw / adet : 0; } }
+  return {adet, raw, birim, toplam};
+}
+function renderForm() {
+  const g = F.tip === "giris";
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === F.tip));
+  document.querySelectorAll(".mode button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === F.mode));
+  if (!g && F.newName) F.newName = "";
+  const has = F.prod || F.newName;
+  $("#pickWrap").hidden = !!has; $("#chosen").hidden = !has;
+  if (has) {
+    const p = F.prod ? S.products.get(F.prod) : null;
+    const n = F.prod ? stockOf(F.prod) : 0;
+    $("#chosen").innerHTML = `<span class="nm"><b>${esc(p ? p.ad : F.newName)}</b><span class="small muted">${p ? esc([p.kasa, p.konum].filter(Boolean).join(" · ")) + ` · stokta <span class="num">${n}</span>` : "Yeni ürün"}</span></span><button type="button" class="btn ghost sm" id="chg">Değiştir</button>`;
+    $("#chg").onclick = clearPick;
+  }
+  $("#newp").hidden = !F.newName;
+  $("#fiyatLbl").textContent = (F.mode === "birim" ? "Birim " : "Toplam ") + (g ? "alış fiyatı" : "satış fiyatı");
+  $("#fiyatHint").textContent = g ? "Boş bırakabilirsin (sayımda gerek yok). Doldurursan kâr hesaplanır." : "Müşteriden alınan tutar. Ciroya bu yazılır.";
+  const {adet, raw, birim, toplam} = formNumbers();
+  $("#totalBox").hidden = !(toplam > 0 && adet > 1);
+  $("#totalVal").textContent = F.mode === "birim" ? tl(toplam) : "Birim " + tl(birim);
+  $("#totalBox").firstElementChild.textContent = F.mode === "birim" ? "Toplam" : "Adet başı";
+  const msg = $("#formMsg"); msg.hidden = true; msg.className = "note";
+  if (raw !== null && isNaN(raw)) { msg.hidden = false; msg.classList.add("bad"); msg.textContent = "Fiyatı sadece rakamla yaz (ör. 12.500 veya 12500,50)."; }
+  else if (!g && F.prod) { const n = stockOf(F.prod); if (adet > n) { msg.hidden = false; msg.classList.add("warn"); msg.textContent = `Stokta ${n} görünüyor, ${adet} düşüyorsun. Kaydedersen stok eksiye düşer; sayımı sonra düzeltebilirsin.`; } }
+  const save = $("#save");
+  save.className = "btn block " + (g ? "in" : "out");
+  save.textContent = g ? (adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : "Satışı kaydet");
+  save.disabled = S.readOnly || !db || !has || adet < 1 || (raw !== null && isNaN(raw)) || (!g && !(raw > 0));
+}
+
+$("#save").onclick = async () => {
+  const {adet, birim} = formNumbers();
+  const btn = $("#save"); btn.disabled = true;
+  try {
+    let urunId = F.prod;
+    if (!urunId) {
+      urunId = await api.addProduct({ad: F.newName.trim(), kategori: $("#np-kat").value, kasa: $("#np-kasa").value.trim(), konum: $("#np-konum").value.trim(), min: 1});
+      S.products.set(urunId, {ad: F.newName.trim(), kategori: $("#np-kat").value, kasa: $("#np-kasa").value.trim(), konum: $("#np-konum").value.trim(), min: 1});
+    }
+    const mv = {urunId, urunAd: pname(urunId), tip: F.tip, adet, birimFiyat: birim ?? 0, tarih: $("#tarih").value || today(), not: $("#not").value.trim(), ts: Date.now()};
+    const mid = await api.addMove(mv);
+    S.moves = [{...mv, id: mid, kim: me?.email || ""}, ...S.moves];
+    toast(`${F.tip === "giris" ? "Eklendi" : "Düşüldü"}: ${mv.urunAd} · ${adet} adet`, () => api.deleteMove(mid).then(reload));
+    F.prod = null; F.newName = ""; $("#adet").value = 1; $("#fiyat").value = ""; $("#not").value = "";
+    $("#np-kasa").value = ""; $("#np-konum").value = "";
+    renderForm(); q.focus();
+  } catch (e) { writeErr(e); renderForm(); }
+};
+
+function writeErr(e) {
+  console.error(e);
+  const c = e?.code;
+  if (c === "42501" || c === "PGRST301") banner("Kayıt yetkin yok. Çıkış yapıp tekrar giriş yap.");
+  else if (c === "23503") toast("Bu ürünün hareketleri var, önce onları sil.");
+  else toast("Kaydedilemedi. İnternet bağlantını kontrol edip tekrar dene.");
+}
+function banner(t) { const b = $("#banner"); b.textContent = t; b.hidden = !t; }
+
+/* ---------- recent ---------- */
+const pendingDel = new Set();
+function moveRow(m, withName = true) {
+  const cls = m.tip === "giris" ? "in" : m.tip === "cikis" ? "out" : "adj";
+  const lbl = m.tip === "giris" ? "Giriş" : m.tip === "cikis" ? "Satış" : "Sayım";
+  const amt = m.tip === "cikis" ? tl(m.adet * m.birimFiyat) : m.tip === "giris" && m.birimFiyat ? tl(m.adet * m.birimFiyat) : "";
+  const q = m.tip === "cikis" ? "−" + m.adet : (m.adet > 0 ? "+" : "") + m.adet;
+  const confirming = pendingDel.has(m.id);
+  return `<div class="li"><span class="pill ${cls}">${lbl}</span>
+    <span class="t"><b>${esc(withName ? pname(m.urunId) : (m.not || lbl))}</b><span>${fmtDate(m.tarih)}${withName && m.not ? " · " + esc(m.not) : ""}${m.kim ? " · " + esc(m.kim.split("@")[0]) : ""}</span></span>
+    <span class="r"><b>${q} ad.</b><span class="small muted num">${amt}</span>
+      <span class="x">${confirming ? `<button class="btn sm danger" data-del="${esc(m.id)}">Evet, sil</button><button class="btn sm ghost" data-cancel="${esc(m.id)}">Vazgeç</button>` : `<button class="btn sm ghost" data-ask="${esc(m.id)}" aria-label="Hareketi sil">Sil</button>`}</span></span></div>`;
+}
+function bindMoveButtons(root, rerender) {
+  root.querySelectorAll("[data-ask]").forEach(b => b.onclick = () => { pendingDel.add(b.dataset.ask); rerender(); });
+  root.querySelectorAll("[data-cancel]").forEach(b => b.onclick = () => { pendingDel.delete(b.dataset.cancel); rerender(); });
+  root.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { const id = b.dataset.del; pendingDel.delete(id);
+    try { await api.deleteMove(id); await reload(); toast("Hareket silindi"); } catch (e) { writeErr(e); } });
+}
+function renderRecent() {
+  const box = $("#recent");
+  const t = today(); let c = 0;
+  for (const m of S.moves) if (m.tip === "cikis" && m.tarih === t) c += m.adet * m.birimFiyat;
+  $("#todaySum").textContent = c ? "Bugün ciro: " + tl(c) : "";
+  if (!S.loaded.m) { box.innerHTML = `<div class="empty">Yükleniyor…</div>`; return; }
+  if (!S.moves.length) { box.innerHTML = `<div class="empty"><b>Henüz hareket yok</b>Soldan ürün adını yaz, adedini seç, “Stoğa ekle”ye bas. Sayım yaparken fiyat girmen gerekmez.</div>`; return; }
+  box.innerHTML = S.moves.slice(0, 40).map(m => moveRow(m)).join("");
+  bindMoveButtons(box, renderRecent);
+}
+
+/* ---------- stok ---------- */
+let katFilter = "Tümü", searchText = "";
+$("#search").oninput = e => { searchText = e.target.value; renderStock(); };
+$("#addProd").onclick = () => openProduct(null);
+function renderStock() {
+  const st = stocks();
+  const all = [...S.products.entries()].map(([id, p]) => ({id, p, n: st.get(id) || 0}));
+  $("#s-cesit").textContent = all.length;
+  $("#s-adet").textContent = all.reduce((a, x) => a + Math.max(0, x.n), 0);
+  $("#s-az").textContent = all.filter(x => x.n <= (x.p.min || 1)).length;
+  const kats = ["Tümü", "Az / bitti", ...KATS.filter(k => all.some(x => x.p.kategori === k))];
+  if (!kats.includes(katFilter)) katFilter = "Tümü";
+  $("#katChips").innerHTML = kats.map(k => `<button class="chip" aria-pressed="${k === katFilter}" data-k="${esc(k)}">${esc(k)}</button>`).join("");
+  $("#katChips").querySelectorAll(".chip").forEach(b => b.onclick = () => { katFilter = b.dataset.k; renderStock(); });
+  const t = norm(searchText).split(/\s+/).filter(Boolean);
+  const rows = all.filter(x => katFilter === "Tümü" || (katFilter === "Az / bitti" ? x.n <= (x.p.min || 1) : x.p.kategori === katFilter))
+    .filter(x => { const h = norm([x.p.ad, x.p.kasa, x.p.kategori, x.p.konum].join(" ")); return t.every(w => h.includes(w)); })
+    .sort((a, b) => a.p.ad.localeCompare(b.p.ad, "tr"));
+  const box = $("#prodList");
+  if (!S.loaded.p) { box.innerHTML = `<div class="empty">Yükleniyor…</div>`; return; }
+  if (!all.length) { box.innerHTML = `<div class="empty"><b>Ürün listesi boş</b>“Gir / Düş” ekranında ürün adını yazıp stok girdiğinde burada görünür. İstersen “Yeni ürün” ile önce listeyi kurabilirsin.</div>`; return; }
+  if (!rows.length) { box.innerHTML = `<div class="empty">Bu filtrede ürün yok.</div>`; return; }
+  box.innerHTML = rows.map(({id, p, n}) => { const [c, l] = stockState(n, p.min);
+    return `<button class="prod" data-id="${esc(id)}"><span style="min-width:0"><b>${esc(p.ad)}</b><span class="meta">${esc([p.kasa, p.kategori, p.konum && "Raf " + p.konum].filter(Boolean).join(" · "))}</span></span>
+      <span class="qty"><span class="pill ${c}">${l}</span><span class="n">${n}</span></span></button>`; }).join("");
+  box.querySelectorAll(".prod").forEach(b => b.onclick = () => openProduct(b.dataset.id));
+}
+
+/* ---------- product sheet ---------- */
+let sheetId = undefined;
+function closeSheet() { $("#sheetHost").innerHTML = ""; sheetId = undefined; }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetId !== undefined) closeSheet(); });
+function openProduct(id) {
+  sheetId = id;
+  const p = id ? S.products.get(id) : {ad: "", kategori: KATS[0], kasa: "", konum: "", min: 1};
+  if (!p) return closeSheet();
+  const n = id ? stockOf(id) : 0;
+  const hist = id ? S.moves.filter(m => m.urunId === id) : [];
+  const ac = id ? avgCosts().get(id) : null;
+  $("#sheetHost").innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ürün">
+    <div class="sheet-h"><h2>${id ? esc(p.ad) : "Yeni ürün"}</h2><button class="btn ghost sm" id="sx">Kapat</button></div>
+    ${id ? `<div class="row" style="justify-content:space-between"><div class="bigq"><span class="num">${n}</span><span class="muted">adet stokta</span></div>
+      <div class="row"><button class="btn in sm" id="sg">＋ Gir</button><button class="btn out sm" id="sd">− Düş</button></div></div>
+      ${ac ? `<div class="small muted">Ortalama alış: <span class="num">${tl(ac)}</span></div>` : ""}` : ""}
+    <div class="field"><label for="e-ad">Ürün adı</label><input id="e-ad" class="inp" value="${esc(p.ad)}"></div>
+    <div class="grid2">
+      <div class="field"><label for="e-kat">Kategori</label><select id="e-kat" class="inp">${KATS.map(k => `<option ${k === p.kategori ? "selected" : ""}>${esc(k)}</option>`).join("")}</select></div>
+      <div class="field"><label for="e-kasa">Kasa</label><input id="e-kasa" class="inp" value="${esc(p.kasa)}" placeholder="G20, G30…"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="e-konum">Raf / konum</label><input id="e-konum" class="inp" value="${esc(p.konum)}"></div>
+      <div class="field"><label for="e-min">“Az” uyarısı (adet)</label><input id="e-min" class="inp" type="number" inputmode="numeric" min="0" value="${esc(p.min ?? 1)}"></div>
+    </div>
+    <button class="btn primary" id="esave">${id ? "Bilgileri kaydet" : "Ürünü ekle"}</button>
+    ${id ? `<div class="panel" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <h3>Sayım düzeltme</h3>
+        <div class="small muted">Rafta saydığın gerçek adedi yaz. Fark “Sayım” hareketi olarak kaydedilir, ciroya girmez.</div>
+        <div class="row"><input id="cnt" class="inp num" type="number" inputmode="numeric" min="0" placeholder="${n}" style="flex:1 1 120px;width:auto"><button class="btn" id="cntBtn">Düzelt</button></div>
+      </div>
+      <div class="panel"><div class="ph"><h3>Hareket geçmişi</h3><span class="small muted">${hist.length} kayıt</span></div><div class="list" id="phist">${hist.length ? hist.slice(0, 50).map(m => moveRow(m, false)).join("") : `<div class="empty">Hareket yok.</div>`}</div></div>
+      <div id="delBox">${hist.length ? `<div class="small muted">Hareketi olan ürün silinemez. Önce hareketlerini sil.</div>` : `<button class="btn danger sm" id="pdel">Ürünü sil</button>`}</div>` : ""}
+  </div></div>`;
+  $("#scrim").onclick = e => { if (e.target.id === "scrim") closeSheet(); };
+  $("#sx").onclick = closeSheet;
+  if (id) {
+    $("#sg").onclick = () => { closeSheet(); F.tip = "giris"; F.prod = id; F.newName = ""; go("hareket"); };
+    $("#sd").onclick = () => { closeSheet(); F.tip = "cikis"; F.prod = id; F.newName = ""; go("hareket"); };
+    bindMoveButtons($("#phist"), () => openProduct(id));
+    $("#cntBtn").onclick = async () => { const v = parseInt($("#cnt").value); if (isNaN(v) || v < 0) return;
+      const diff = v - stockOf(id); if (!diff) { toast("Stok zaten " + v); return; }
+      try { await api.addMove({urunId: id, urunAd: p.ad, tip: "sayim", adet: diff, birimFiyat: 0, tarih: today(), not: `Sayım: ${v}`, ts: Date.now()}); await reload(); toast(`Stok ${v} olarak düzeltildi`); } catch (e) { writeErr(e); } };
+    const pd = $("#pdel"); if (pd) pd.onclick = () => { pd.outerHTML = `<div class="row"><button class="btn danger sm" id="pdel2">Evet, ürünü sil</button><button class="btn ghost sm" id="pdelc">Vazgeç</button></div>`;
+      $("#pdelc").onclick = () => openProduct(id);
+      $("#pdel2").onclick = async () => { try { await api.deleteProduct(id); closeSheet(); await reload(); toast("Ürün silindi"); } catch (e) { writeErr(e); } }; };
+  }
+  $("#esave").onclick = async () => {
+    const d = {ad: $("#e-ad").value.trim(), kategori: $("#e-kat").value, kasa: $("#e-kasa").value.trim(), konum: $("#e-konum").value.trim(), min: Math.max(0, parseInt($("#e-min").value) || 0)};
+    if (!d.ad) { $("#e-ad").focus(); return; }
+    try { if (id) await api.updateProduct(id, d); else await api.addProduct(d); closeSheet(); await reload(); toast(id ? "Kaydedildi" : "Ürün eklendi"); } catch (e) { writeErr(e); }
+  };
+  if (!id) setTimeout(() => $("#e-ad").focus(), 0);
+}
+
+/* ---------- ciro ---------- */
+const PERIODS = [["bugun", "Bugün"], ["hafta", "Bu hafta"], ["ay", "Bu ay"], ["yil", "Bu yıl"], ["gecenay", "Geçen ay"], ["ozel", "Tarih seç"]];
+let period = "ay";
+try { period = localStorage.getItem("bk-period") || "ay"; } catch (e) {}
+$("#periods").innerHTML = PERIODS.map(([k, l]) => `<button class="chip" data-p="${k}">${l}</button>`).join("");
+$("#periods").querySelectorAll(".chip").forEach(b => b.onclick = () => { period = b.dataset.p; try { localStorage.setItem("bk-period", period); } catch (e) {} renderCiro(); });
+$("#from").onchange = $("#to").onchange = () => renderCiro();
+function range() {
+  const n = new Date(), y = n.getFullYear(), m = n.getMonth();
+  if (period === "bugun") return [today(), today()];
+  if (period === "hafta") { const d = new Date(n); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); const e = new Date(d); e.setDate(d.getDate() + 6); return [iso(d), iso(e)]; }
+  if (period === "ay") return [iso(new Date(y, m, 1)), iso(new Date(y, m + 1, 0))];
+  if (period === "gecenay") return [iso(new Date(y, m - 1, 1)), iso(new Date(y, m, 0))];
+  if (period === "yil") return [y + "-01-01", y + "-12-31"];
+  if (!$("#from").value) $("#from").value = iso(new Date(y, m, 1));
+  if (!$("#to").value) $("#to").value = today();
+  const a = $("#from").value, b = $("#to").value; return a <= b ? [a, b] : [b, a];
+}
+function renderCiro() {
+  $("#periods").querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", b.dataset.p === period));
+  $("#customBox").hidden = period !== "ozel";
+  const [a, b] = range();
+  $("#rangeLbl").textContent = a === b ? parseISO(a).toLocaleDateString("tr-TR", {day: "numeric", month: "long", year: "numeric", weekday: "long"})
+    : parseISO(a).toLocaleDateString("tr-TR", {day: "numeric", month: "long"}) + " – " + parseISO(b).toLocaleDateString("tr-TR", {day: "numeric", month: "long", year: "numeric"});
+  const sales = S.moves.filter(m => m.tip === "cikis" && m.tarih >= a && m.tarih <= b);
+  const buys = S.moves.filter(m => m.tip === "giris" && m.tarih >= a && m.tarih <= b && m.birimFiyat > 0);
+  const ac = avgCosts();
+  let ciro = 0, adet = 0, kar = 0, karCiro = 0, noCost = 0;
+  for (const m of sales) { const t = m.adet * m.birimFiyat; ciro += t; adet += m.adet; const c = ac.get(m.urunId); if (c != null) { kar += t - m.adet * c; karCiro += t; } else noCost++; }
+  const alis = buys.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
+  $("#kpis").innerHTML = `
+    <div class="panel kpi lead"><span>Ciro</span><b>${tl(ciro)}</b><small>${sales.length} satış</small></div>
+    <div class="panel kpi"><span>Brüt kâr</span><b>${karCiro ? tl(kar) : "—"}</b><small>${karCiro ? (noCost ? `${noCost} satışta alış fiyatı yok` : "ortalama alış fiyatına göre") : "alış fiyatı girilince görünür"}</small></div>
+    <div class="panel kpi"><span>Satılan adet</span><b>${adet}</b><small>${sales.length ? "ort. satış " + tl(ciro / sales.length) : "&nbsp;"}</small></div>
+    <div class="panel kpi"><span>Mal alımı</span><b>${tl(alis)}</b><small>fiyatlı stok girişleri</small></div>`;
+  renderChart(sales, a, b);
+  const byP = new Map(), byK = new Map();
+  for (const m of sales) { const t = m.adet * m.birimFiyat; byP.set(m.urunId, (byP.get(m.urunId) || 0) + t); const k = S.products.get(m.urunId)?.kategori || "Diğer"; byK.set(k, (byK.get(k) || 0) + t); }
+  const bars = (map, nameFn) => { const arr = [...map.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6); const max = arr[0]?.[1] || 1;
+    return arr.length ? arr.map(([k, v]) => `<div class="bar-row"><b>${esc(nameFn(k))}</b><span class="num">${tl(v)}</span><span class="track"><i style="width:${Math.max(2, v / max * 100)}%"></i></span></div>`).join("") : `<div class="empty small">Bu aralıkta satış yok.</div>`; };
+  $("#topProd").innerHTML = bars(byP, pname);
+  $("#topKat").innerHTML = bars(byK, k => k);
+}
+function renderChart(sales, a, b) {
+  const da = parseISO(a), db_ = parseISO(b);
+  const days = Math.round((db_ - da) / 864e5) + 1;
+  const monthly = days > 62;
+  const buckets = [];
+  if (monthly) { const d = new Date(da.getFullYear(), da.getMonth(), 1); while (d <= db_) { buckets.push({k: d.getFullYear() + "-" + pad(d.getMonth() + 1), l: d.toLocaleDateString("tr-TR", {month: "short"}), v: 0}); d.setMonth(d.getMonth() + 1); } }
+  else { const d = new Date(da); while (d <= db_) { buckets.push({k: iso(d), l: String(d.getDate()), v: 0}); d.setDate(d.getDate() + 1); } }
+  const idx = new Map(buckets.map((x, i) => [x.k, i]));
+  for (const m of sales) { const k = monthly ? m.tarih.slice(0, 7) : m.tarih; const i = idx.get(k); if (i != null) buckets[i].v += m.adet * m.birimFiyat; }
+  $("#chartTitle").textContent = monthly ? "Aylık ciro" : "Günlük ciro";
+  const max = Math.max(...buckets.map(x => x.v), 0);
+  if (!max) { $("#chart").innerHTML = `<div class="empty small">Bu aralıkta satış yok. Satış kaydettikçe grafik dolar.</div>`; return; }
+  const step = (() => { const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; })();
+  const top = step * Math.ceil(max / step);
+  const W = Math.max(520, buckets.length * 22 + 60), H = 220, L = 52, R = 8, T = 10, B = 26;
+  const iw = W - L - R, ih = H - T - B, bw = iw / buckets.length;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ciro grafiği">`;
+  for (let v = 0; v <= top + 1e-9; v += step) { const y = T + ih - v / top * ih;
+    s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${tlShort(v)}</text>`; }
+  const every = buckets.length > 16 ? Math.ceil(buckets.length / 10) : 1;
+  buckets.forEach((x, i) => { const h = x.v / top * ih, xx = L + i * bw + bw * .15;
+    if (x.v) s += `<rect x="${xx}" y="${T + ih - h}" width="${bw * .7}" height="${h}" rx="2" fill="var(--accent)"><title>${x.l}: ${tl(x.v)}</title></rect>`;
+    if (i % every === 0) s += `<text x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${esc(x.l)}</text>`; });
+  $("#chart").innerHTML = s + "</svg>";
+}
+$("#csv").onclick = async () => {
+  const [a, b] = range();
+  const rows = S.moves.filter(m => m.tarih >= a && m.tarih <= b).slice().sort((x, y) => x.tarih.localeCompare(y.tarih) || x.ts - y.ts);
+  const cell = v => { v = String(v ?? ""); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const num = n => String(Math.round(n * 100) / 100).replace(".", ",");
+  const lines = [["Tarih", "Tip", "Ürün", "Kategori", "Kasa", "Adet", "Birim fiyat", "Tutar", "Not"].join(";")];
+  for (const m of rows) { const p = S.products.get(m.urunId) || {};
+    lines.push([m.tarih, m.tip === "giris" ? "Giriş" : m.tip === "cikis" ? "Satış" : "Sayım", pname(m.urunId), p.kategori, p.kasa, m.tip === "cikis" ? -m.adet : m.adet, num(m.birimFiyat), num(m.adet * m.birimFiyat), m.not].map(cell).join(";")); }
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type: "text/csv;charset=utf-8"});
+  const a_ = document.createElement("a"); a_.href = URL.createObjectURL(blob); a_.download = `bk-stok-hareketler-${a}_${b}.csv`;
+  document.body.appendChild(a_); a_.click(); a_.remove(); setTimeout(() => URL.revokeObjectURL(a_.href), 2000);
+};
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(text, undo) {
+  clearTimeout(toastT);
+  $("#toastHost").innerHTML = `<div class="toast" role="status"><span>${esc(text)}</span>${undo ? `<button id="undo">Geri al</button>` : ""}</div>`;
+  if (undo) $("#undo").onclick = async () => { $("#toastHost").innerHTML = ""; try { await undo(); toast("Geri alındı"); } catch (e) { writeErr(e); } };
+  toastT = setTimeout(() => $("#toastHost").innerHTML = "", 6000);
+}
+
+function refreshSheet() { if (sheetId && !document.activeElement?.closest?.(".sheet input, .sheet select")) openProduct(sheetId); }
+/* ---------- sync ---------- */
+function setSync(state, text) { const el = $("#sync"); el.className = "sync " + state; el.lastElementChild.textContent = text; }
+async function reload() {
+  const [p, m] = await Promise.all([
+    sb.from("urunler").select("*").order("ad"),
+    sb.from("hareketler").select("*").order("ts", {ascending: false}).limit(10000),
+  ]);
+  if (p.error || m.error) throw (p.error || m.error);
+  S.products = new Map(p.data.map(r => [r.id, {ad: r.ad, kategori: r.kategori, kasa: r.kasa || "", konum: r.konum || "", min: r.min ?? 1}]));
+  S.moves = m.data.map(toMove);
+  S.loaded = {p: true, m: true};
+  if (F.prod && !S.products.has(F.prod)) F.prod = null;
+  setSync("ok", "Kayıtlı");
+  render(); refreshSheet();
+}
+let reloadT = null;
+function startData() {
+  db = sb;
+  const v0 = location.hash.slice(1);
+  let v = v0;
+  if (!["hareket", "stok", "ciro"].includes(v)) { try { v = localStorage.getItem("bk-view") || "hareket"; } catch (e) { v = "hareket"; } }
+  go(["hareket", "stok", "ciro"].includes(v) ? v : "hareket");
+  reload().catch(e => { console.error(e); setSync("err", "Bağlantı yok"); banner("Veriler alınamadı. İnternet bağlantını kontrol edip sayfayı yenile."); });
+  const later = () => { clearTimeout(reloadT); reloadT = setTimeout(() => reload().catch(() => setSync("err", "Bağlantı yok")), 300); };
+  sb.channel("bk-stok")
+    .on("postgres_changes", {event: "*", schema: "public", table: "urunler"}, later)
+    .on("postgres_changes", {event: "*", schema: "public", table: "hareketler"}, later)
+    .subscribe();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") later(); });
+}
+
+let signup = false;
+$("#loginMode").onclick = () => {
+  signup = !signup;
+  $("#loginBtn").textContent = signup ? "Hesap oluştur" : "Giriş yap";
+  $("#loginMode").textContent = signup ? "Hesabın var mı? Giriş yap" : "İlk kez mi? Hesap oluştur";
+  $("#loginSub").textContent = signup ? "E-postanı ve en az 6 karakterli bir şifre belirle." : "Hesabınla giriş yap.";
+  $("#lp").autocomplete = signup ? "new-password" : "current-password";
+  $("#loginMsg").hidden = true;
+};
+$("#loginForm").onsubmit = async e => {
+  e.preventDefault();
+  const btn = $("#loginBtn"); btn.disabled = true; $("#loginMsg").hidden = true;
+  const email = $("#le").value.trim(), password = $("#lp").value;
+  const {data, error} = signup ? await sb.auth.signUp({email, password}) : await sb.auth.signInWithPassword({email, password});
+  btn.disabled = false;
+  let m = "";
+  if (error) {
+    m = /invalid login/i.test(error.message) ? "E-posta ya da şifre yanlış."
+      : /not allowed|disabled/i.test(error.message) ? "Yeni hesap açma kapalı. Emirhan'dan seni eklemesini iste."
+      : /already registered/i.test(error.message) ? "Bu e-postayla hesap var, giriş yap."
+      : /not confirmed/i.test(error.message) ? "E-postana gelen onay linkine tıkla, sonra giriş yap."
+      : error.message;
+  } else if (signup && !data.session) m = "Hesap oluşturuldu. E-postana gelen onay linkine tıkla, sonra giriş yap.";
+  if (m) { $("#loginMsg").textContent = m; $("#loginMsg").hidden = false; }
+};
+$("#logout").onclick = () => sb.auth.signOut();
+function showAuth(session) {
+  const was = me;
+  me = session?.user || null;
+  if (was && !me) { location.reload(); return; }
+  $("#loginView").hidden = !!me;
+  $("#appView").hidden = !me;
+  if (me && !db) startData();
+}
+sb.auth.getSession().then(({data}) => showAuth(data.session));
+sb.auth.onAuthStateChange((_e, session) => { if (!!session?.user !== !!me) showAuth(session); });
+})();
+</script>
+</body>
+</html>
