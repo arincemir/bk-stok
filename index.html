@@ -522,7 +522,7 @@ function renderForm() {
   }
   $("#newp").hidden = !F.newName;
   $("#fiyatLbl").textContent = (F.mode === "birim" ? "Birim " : "Toplam ") + (g ? "alış fiyatı" : "satış fiyatı");
-  $("#fiyatHint").textContent = g ? "Boş bırakabilirsin (sayımda gerek yok). Doldurursan kâr hesaplanır." : "Müşteriden alınan tutar. Ciroya bu yazılır.";
+  $("#fiyatHint").textContent = g ? "Boş bırakabilirsin (sayımda gerek yok). Doldurursan kâr hesaplanır." : "Müşteriden alınan tutar. Ciroya bu yazılır. Hediyeyse 0 yaz.";
   const {adet, raw, birim, toplam} = formNumbers();
   $("#totalBox").hidden = !(toplam > 0 && adet > 1);
   $("#totalVal").textContent = F.mode === "birim" ? tl(toplam) : "Birim " + tl(birim);
@@ -532,8 +532,8 @@ function renderForm() {
   else if (!g && F.prod) { const n = stockOf(F.prod); if (adet > n) { msg.hidden = false; msg.classList.add("warn"); msg.textContent = `Stokta ${n} görünüyor, ${adet} düşüyorsun. Kaydedersen stok eksiye düşer; sayımı sonra düzeltebilirsin.`; } }
   const save = $("#save");
   save.className = "btn block " + (g ? "in" : "out");
-  save.textContent = g ? (adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : "Satışı kaydet");
-  save.disabled = S.readOnly || !db || !has || adet < 1 || (raw !== null && isNaN(raw)) || (!g && !(raw > 0));
+  save.textContent = g ? (adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : raw === 0 ? "Satışı kaydet · 0 ₺ (hediye)" : "Satışı kaydet");
+  save.disabled = S.readOnly || !db || !has || adet < 1 || (raw !== null && isNaN(raw)) || (!g && (raw === null || !(raw >= 0)));
 }
 
 $("#save").onclick = async () => {
