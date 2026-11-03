@@ -197,6 +197,43 @@ textarea.inp{height:auto;padding:10px 12px;min-height:48px;resize:vertical}
 .kpi small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .kpi.lead{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .kpi.lead span,.kpi.lead small{color:var(--accent-ink);opacity:.8}
+button.kpi{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;position:relative;transition:border-color .15s,transform .1s}
+button.kpi:hover{border-color:var(--accent)}
+button.kpi.lead:hover{filter:brightness(1.06)}
+button.kpi:active{transform:scale(.985)}
+button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpi .go{position:absolute;top:12px;right:12px;width:18px;height:18px;color:var(--muted);opacity:.7}
+.kpi.lead .go{color:var(--accent-ink)}
+
+/* kpi detay penceresi */
+.dsheet{max-width:640px;padding:0;gap:0}
+.dsheet .dh{position:sticky;top:0;z-index:1;background:var(--surface);border-bottom:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px))}
+.dsheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+@media (min-width:860px){.dsheet .grab{display:none}.dsheet .dh{padding-top:18px}}
+.dh-top{display:flex;align-items:flex-start;gap:12px}
+.dh-top>div{flex:1;min-width:0}
+.dh-top .lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dh-top .big{display:block;font-family:var(--f-num);font-size:32px;font-weight:600;line-height:1.15;margin-top:4px}
+.dh-top .rng{font-size:13px;color:var(--muted);margin-top:2px}
+.dstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.dstats div{background:var(--sunk);border-radius:8px;padding:8px 10px;min-width:0}
+.dstats span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dstats b{display:block;font-family:var(--f-num);font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.dlist{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.dday{display:flex;justify-content:space-between;gap:12px;background:var(--sunk);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  padding:8px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+.dday .num{letter-spacing:0}
+.drow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;border-top:1px solid var(--line);
+  padding:12px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
+.dday+.drow{border-top:0}
+.drow .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .m{font-size:13px;color:var(--muted);grid-column:1}
+.drow .v{grid-column:2;grid-row:1/span 2;text-align:right;font-family:var(--f-num);font-weight:600}
+.drow .v small{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+.drow .v.pos{color:var(--in)} .drow .v.neg{color:var(--bad)}
+.drow .track{grid-column:1/-1;height:5px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:6px}
+.drow .track i{display:block;height:100%;background:var(--accent);border-radius:3px}
 .chart{padding:16px;overflow-x:auto}
 .chart svg{display:block;width:100%;min-width:520px;height:auto}
 .two{display:grid;gap:16px}
@@ -404,6 +441,7 @@ function stockState(n, min) { if (n <= 0) return ["bad", "Yok"]; if (n <= (min |
 
 /* ---------- views ---------- */
 function go(v) {
+  if (kpiOpen) closeKpi();
   view = v;
   for (const id of ["hareket", "stok", "ciro"]) $("#v-" + id).hidden = id !== v;
   document.querySelectorAll("[data-go]").forEach(b => b.toggleAttribute("aria-current", false) || (b.dataset.go === v && b.setAttribute("aria-current", "page")));
@@ -669,11 +707,14 @@ function renderCiro() {
   let ciro = 0, adet = 0, kar = 0, karCiro = 0, noCost = 0;
   for (const m of sales) { const t = m.adet * m.birimFiyat; ciro += t; adet += m.adet; const c = ac.get(m.urunId); if (c != null) { kar += t - m.adet * c; karCiro += t; } else noCost++; }
   const alis = buys.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
+  const go_ = `<svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
   $("#kpis").innerHTML = `
-    <div class="panel kpi lead"><span>Ciro</span><b>${tl(ciro)}</b><small>${sales.length} satış</small></div>
-    <div class="panel kpi"><span>Brüt kâr</span><b>${karCiro ? tl(kar) : "—"}</b><small>${karCiro ? (noCost ? `${noCost} satışta alış fiyatı yok` : "ortalama alış fiyatına göre") : "alış fiyatı girilince görünür"}</small></div>
-    <div class="panel kpi"><span>Satılan adet</span><b>${adet}</b><small>${sales.length ? "ort. satış " + tl(ciro / sales.length) : "&nbsp;"}</small></div>
-    <div class="panel kpi"><span>Mal alımı</span><b>${tl(alis)}</b><small>fiyatlı stok girişleri</small></div>`;
+    <button class="panel kpi lead" data-k="ciro" aria-label="Ciro detayı">${go_}<span>Ciro</span><b>${tl(ciro)}</b><small>${sales.length} satış</small></button>
+    <button class="panel kpi" data-k="kar" aria-label="Brüt kâr detayı">${go_}<span>Brüt kâr</span><b>${karCiro ? tl(kar) : "—"}</b><small>${karCiro ? (noCost ? `${noCost} satışta alış fiyatı yok` : "ortalama alış fiyatına göre") : "alış fiyatı girilince görünür"}</small></button>
+    <button class="panel kpi" data-k="adet" aria-label="Satılan adet detayı">${go_}<span>Satılan adet</span><b>${adet}</b><small>${sales.length ? "ort. satış " + tl(ciro / sales.length) : "&nbsp;"}</small></button>
+    <button class="panel kpi" data-k="alis" aria-label="Mal alımı detayı">${go_}<span>Mal alımı</span><b>${tl(alis)}</b><small>fiyatlı stok girişleri</small></button>`;
+  $("#kpis").querySelectorAll("[data-k]").forEach(b => b.onclick = () => openKpi(b.dataset.k));
+  if (kpiOpen) openKpi(kpiOpen);
   renderChart(sales, a, b);
   const byP = new Map(), byK = new Map();
   for (const m of sales) { const t = m.adet * m.birimFiyat; byP.set(m.urunId, (byP.get(m.urunId) || 0) + t); const k = S.products.get(m.urunId)?.kategori || "Diğer"; byK.set(k, (byK.get(k) || 0) + t); }
@@ -685,6 +726,74 @@ function renderCiro() {
   bindMoveButtons($("#salesList"), renderCiro);
   $("#topProd").innerHTML = bars(byP, pname);
   $("#topKat").innerHTML = bars(byK, k => k);
+}
+/* ---------- kpi detay ---------- */
+var kpiOpen = null;
+function closeKpi() { kpiOpen = null; $("#sheetHost").innerHTML = ""; }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && kpiOpen) closeKpi(); });
+function openKpi(k) {
+  if (sheetId !== undefined) return;
+  kpiOpen = k;
+  const [a, b] = range();
+  const rng = $("#rangeLbl").textContent;
+  const inR = m => m.tarih >= a && m.tarih <= b;
+  const byNew = (x, y) => y.tarih.localeCompare(x.tarih) || y.ts - x.ts;
+  const sales = S.moves.filter(m => m.tip === "cikis" && inR(m)).sort(byNew);
+  const ac = avgCosts();
+  const kim = m => m.kim ? " · " + esc(m.kim.split("@")[0]) : "";
+  const dayLbl = d => parseISO(d).toLocaleDateString("tr-TR", {day: "numeric", month: "long", weekday: "long"});
+  // tarih başlıklı liste: aynı güne düşen satırlar bir başlık altında, başlıkta günün toplamı
+  const byDay = (rows, val, row) => { let out = "", cur = null;
+    const tot = new Map(); for (const m of rows) tot.set(m.tarih, (tot.get(m.tarih) || 0) + val(m));
+    for (const m of rows) { if (m.tarih !== cur) { cur = m.tarih; out += `<div class="dday"><span>${dayLbl(cur)}</span><span class="num">${tl(tot.get(cur))}</span></div>`; } out += row(m); }
+    return out; };
+  const empty = t => `<div class="empty small">${t}</div>`;
+  let title, big, stats = "", body;
+  if (k === "ciro") {
+    const tot = sales.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
+    title = "Ciro"; big = tl(tot);
+    stats = [["Satış", sales.length], ["Adet", sales.reduce((s, m) => s + m.adet, 0)], ["Ort. satış", sales.length ? tl(tot / sales.length) : "—"]];
+    body = sales.length ? byDay(sales, m => m.adet * m.birimFiyat, m => `<div class="drow"><span class="n">${esc(pname(m.urunId))}</span>
+      <span class="m">${m.adet} ad. × ${tl(m.birimFiyat)}${kim(m)}</span><span class="v">${tl(m.adet * m.birimFiyat)}</span></div>`) : empty("Bu aralıkta satış yok.");
+  } else if (k === "kar") {
+    let ciro = 0, cost = 0, kar = 0;
+    const rows = sales.map(m => { const t = m.adet * m.birimFiyat, c = ac.get(m.urunId); const r = {m, t, c: c == null ? null : m.adet * c};
+      if (r.c != null) { ciro += t; cost += r.c; kar += t - r.c; } return r; });
+    title = "Brüt kâr"; big = ciro ? tl(kar) : "—";
+    stats = [["Ciro", tl(ciro)], ["Maliyet", tl(cost)], ["Marj", ciro ? "%" + TL.format(Math.round(kar / ciro * 1000) / 10) : "—"]];
+    const miss = rows.filter(r => r.c == null).length;
+    body = (miss ? `<div class="note warn" style="margin:12px 16px 0">${miss} satışta alış fiyatı yok; kâra katılmadı.</div>` : "")
+      + (rows.length ? byDay(rows.map(r => Object.assign({}, r.m, {_r: r})), m => m._r.c == null ? 0 : m._r.t - m._r.c, m => { const r = m._r, p = r.c == null ? null : r.t - r.c;
+        return `<div class="drow"><span class="n">${esc(pname(m.urunId))}</span>
+        <span class="m">${tl(r.t)} satış − ${r.c == null ? "alış fiyatı yok" : tl(r.c) + " maliyet"}</span>
+        <span class="v ${p == null ? "" : p >= 0 ? "pos" : "neg"}">${p == null ? "—" : (p >= 0 ? "+" : "") + tl(p)}${p != null && r.t ? `<small>%${TL.format(Math.round(p / r.t * 1000) / 10)}</small>` : ""}</span></div>`; }) : empty("Bu aralıkta satış yok."));
+  } else if (k === "adet") {
+    const g = new Map();
+    for (const m of sales) { const o = g.get(m.urunId) || {q: 0, t: 0, n: 0}; o.q += m.adet; o.t += m.adet * m.birimFiyat; o.n++; g.set(m.urunId, o); }
+    const arr = [...g.entries()].sort((x, y) => y[1].q - x[1].q || y[1].t - x[1].t);
+    const tot = arr.reduce((s, [, o]) => s + o.q, 0), max = arr[0]?.[1].q || 1;
+    title = "Satılan adet"; big = String(tot);
+    stats = [["Ürün çeşidi", arr.length], ["Satış", sales.length], ["Ort. birim", tot ? tl(arr.reduce((s, [, o]) => s + o.t, 0) / tot) : "—"]];
+    body = arr.length ? arr.map(([id, o]) => `<div class="drow"><span class="n">${esc(pname(id))}</span>
+      <span class="m">${o.n} satış · ort. ${tl(o.t / o.q)} · ${tl(o.t)}</span><span class="v">${o.q} ad.</span>
+      <span class="track"><i style="width:${Math.max(3, o.q / max * 100)}%"></i></span></div>`).join("") : empty("Bu aralıkta satış yok.");
+  } else {
+    const buys = S.moves.filter(m => m.tip === "giris" && inR(m) && m.birimFiyat > 0).sort(byNew);
+    const tot = buys.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
+    title = "Mal alımı"; big = tl(tot);
+    stats = [["Giriş", buys.length], ["Adet", buys.reduce((s, m) => s + m.adet, 0)], ["Ürün çeşidi", new Set(buys.map(m => m.urunId)).size]];
+    body = buys.length ? byDay(buys, m => m.adet * m.birimFiyat, m => `<div class="drow"><span class="n">${esc(pname(m.urunId))}</span>
+      <span class="m">${m.adet} ad. × ${tl(m.birimFiyat)}${m.not ? " · " + esc(m.not) : ""}</span><span class="v">${tl(m.adet * m.birimFiyat)}</span></div>`) : empty("Bu aralıkta fiyatlı stok girişi yok.");
+  }
+  const keep = $("#dsc")?.scrollTop || 0, same = $("#dsc")?.dataset.k === k;
+  $("#sheetHost").innerHTML = `<div class="scrim" id="dscrim"><div class="sheet dsheet" id="dsc" data-k="${k}" role="dialog" aria-modal="true" aria-label="${title} detayı">
+    <div class="dh"><div class="grab"></div><div class="dh-top"><div><span class="lbl">${title}</span><b class="big">${big}</b><div class="rng">${esc(rng)}</div></div>
+      <button class="btn ghost sm" id="dsx">Kapat</button></div>
+      ${stats ? `<div class="dstats">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join("")}</div>` : ""}</div>
+    <div class="dlist">${body}</div></div></div>`;
+  if (same) $("#dsc").scrollTop = keep;
+  $("#dscrim").onclick = e => { if (e.target.id === "dscrim") closeKpi(); };
+  $("#dsx").onclick = closeKpi;
 }
 function renderChart(sales, a, b) {
   const da = parseISO(a), db_ = parseISO(b);
