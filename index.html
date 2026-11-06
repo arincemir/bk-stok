@@ -227,6 +227,20 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .drow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;border-top:1px solid var(--line);
   padding:12px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .dday+.drow{border-top:0}
+/* veresiye */
+.tag{display:inline-block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:1px}
+.tag.ver{background:var(--warn-soft);color:var(--warn)}
+.tag.paid{background:var(--in-soft);color:var(--in)}
+.mode button[data-o="veresiye"][aria-pressed="true"]{background:var(--warn-soft);color:var(--warn)}
+.kpi.wide{grid-column:1/-1}
+.kpi.ver b{color:var(--warn)}
+.vh{display:flex;align-items:center;gap:10px;border-top:6px solid var(--sunk);
+  padding:12px max(16px,env(safe-area-inset-right,0px)) 4px max(16px,env(safe-area-inset-left,0px))}
+.vh:first-child{border-top:0}
+.vh b{flex:1;min-width:0;font-size:17px;font-weight:700;overflow-wrap:anywhere}
+.vh .num{font-family:var(--f-num);font-weight:600;color:var(--warn)}
+.vh+.drow{border-top:0}
+.drow .v .btn{display:flex;margin:6px 0 0 auto;border-color:var(--line)}
 .drow .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .drow .m{font-size:13px;color:var(--muted);grid-column:1}
 .drow .v{grid-column:2;grid-row:1/span 2;text-align:right;font-family:var(--f-num);font-weight:600}
@@ -339,6 +353,21 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
           <div id="totalBox" class="total" hidden><span class="muted">Toplam</span><span class="num" id="totalVal">0 ₺</span></div>
 
+          <div id="odemeBox" class="field" hidden>
+            <div class="row" style="justify-content:space-between">
+              <label>Ödeme</label>
+              <div class="mode" role="group" aria-label="Ödeme şekli">
+                <button data-o="pesin" aria-pressed="true">Peşin</button>
+                <button data-o="veresiye" aria-pressed="false">Veresiye</button>
+              </div>
+            </div>
+            <div id="musteriBox" class="field" hidden>
+              <input id="musteri" class="inp" placeholder="Kimde? Müşteri adı" list="musteriList" autocomplete="off">
+              <datalist id="musteriList"></datalist>
+              <div class="small muted">Ciroya bugün yazılır. Para gelince Ciro → Veresiye'den “Ödendi” de.</div>
+            </div>
+          </div>
+
           <div class="grid2">
             <div class="field"><label for="tarih">Tarih</label><input id="tarih" class="inp" type="date"></div>
             <div class="field"><label for="not">Not <span class="muted">(ops.)</span></label><input id="not" class="inp" placeholder="Müşteri, plaka…"></div>
@@ -419,16 +448,18 @@ const norm = s => String(s || "").toLocaleLowerCase("tr-TR").normalize("NFD").re
 
 const sb = supabase.createClient(window.BK_CONFIG.url, window.BK_CONFIG.anonKey, {auth: {persistSession: true, autoRefreshToken: true}});
 let db = null, me = null;
-const toMove = r => ({id: r.id, urunId: r.urun_id, urunAd: r.urun_ad, tip: r.tip, adet: Number(r.adet) || 0, birimFiyat: Number(r.birim_fiyat) || 0, tarih: r.tarih, not: r.not_metni || "", ts: Number(r.ts) || 0, kim: r.kullanici || ""});
+const toMove = r => ({id: r.id, urunId: r.urun_id, urunAd: r.urun_ad, tip: r.tip, adet: Number(r.adet) || 0, birimFiyat: Number(r.birim_fiyat) || 0, tarih: r.tarih, not: r.not_metni || "", ts: Number(r.ts) || 0, kim: r.kullanici || "",
+  odeme: r.odeme || "pesin", musteri: r.musteri || "", odendi: r.odendi || null});
 const api = {
   async addProduct(d) { const {data, error} = await sb.from("urunler").insert(d).select("id").single(); if (error) throw error; return data.id; },
   async updateProduct(id, d) { const {error} = await sb.from("urunler").update(d).eq("id", id); if (error) throw error; },
   async deleteProduct(id) { const {error} = await sb.from("urunler").delete().eq("id", id); if (error) throw error; },
-  async addMove(m) { const {data, error} = await sb.from("hareketler").insert({urun_id: m.urunId, urun_ad: m.urunAd, tip: m.tip, adet: m.adet, birim_fiyat: m.birimFiyat, tarih: m.tarih, not_metni: m.not, ts: m.ts}).select("id").single(); if (error) throw error; return data.id; },
+  async addMove(m) { const {data, error} = await sb.from("hareketler").insert({urun_id: m.urunId, urun_ad: m.urunAd, tip: m.tip, adet: m.adet, birim_fiyat: m.birimFiyat, tarih: m.tarih, not_metni: m.not, ts: m.ts, ...(m.odeme === "veresiye" ? {odeme: "veresiye", musteri: m.musteri} : {})}).select("id").single(); if (error) throw error; return data.id; },
+  async setPaid(ids, d) { const {error} = await sb.from("hareketler").update({odendi: d}).in("id", ids); if (error) throw error; },
   async deleteMove(id) { const {error} = await sb.from("hareketler").delete().eq("id", id); if (error) throw error; },
 };
 const S = { products: new Map(), moves: [], loaded: {p: false, m: false}, readOnly: false };
-const F = { tip: "giris", prod: null, newName: "", mode: "birim", hl: -1 };
+const F = { tip: "giris", prod: null, newName: "", mode: "birim", hl: -1, ver: false };
 let view = "hareket";
 
 /* ---------- derived ---------- */
@@ -437,6 +468,7 @@ function stocks() { const map = new Map(); for (const m of S.moves) { const d = 
 function avgCosts() { const a = new Map(); for (const m of S.moves) if (m.tip === "giris" && m.birimFiyat > 0) { const o = a.get(m.urunId) || {q: 0, t: 0}; o.q += m.adet; o.t += m.adet * m.birimFiyat; a.set(m.urunId, o); }
   const r = new Map(); a.forEach((o, k) => r.set(k, o.t / o.q)); return r; }
 const pname = id => S.products.get(id)?.ad || "(silinmiş ürün)";
+const openVer = () => S.moves.filter(m => m.tip === "cikis" && m.odeme === "veresiye" && !m.odendi);
 function stockState(n, min) { if (n <= 0) return ["bad", "Yok"]; if (n <= (min || 1)) return ["warn", "Az"]; return ["ok", "Var"]; }
 
 /* ---------- views ---------- */
@@ -456,7 +488,9 @@ function render() { renderForm(); renderRecent(); if (view === "stok") renderSto
 
 /* ---------- hareket form ---------- */
 document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { F.tip = b.dataset.t; if (F.tip === "cikis" && !F.prod) { F.newName = ""; } renderForm(); });
-document.querySelectorAll(".mode button").forEach(b => b.onclick = () => { F.mode = b.dataset.m; renderForm(); });
+document.querySelectorAll(".mode button[data-m]").forEach(b => b.onclick = () => { F.mode = b.dataset.m; renderForm(); });
+document.querySelectorAll(".mode button[data-o]").forEach(b => b.onclick = () => { F.ver = b.dataset.o === "veresiye"; renderForm(); if (F.ver) $("#musteri").focus(); });
+$("#musteri").oninput = () => renderForm();
 $("#minus").onclick = () => { $("#adet").value = Math.max(1, (parseInt($("#adet").value) || 1) - 1); renderForm(); };
 $("#plus").onclick = () => { $("#adet").value = (parseInt($("#adet").value) || 0) + 1; renderForm(); };
 $("#adet").oninput = $("#fiyat").oninput = () => renderForm();
@@ -510,7 +544,11 @@ function formNumbers() {
 function renderForm() {
   const g = F.tip === "giris";
   document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === F.tip));
-  document.querySelectorAll(".mode button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === F.mode));
+  document.querySelectorAll(".mode button[data-m]").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === F.mode));
+  document.querySelectorAll(".mode button[data-o]").forEach(b => b.setAttribute("aria-pressed", (b.dataset.o === "veresiye") === F.ver));
+  $("#odemeBox").hidden = g; $("#musteriBox").hidden = g || !F.ver;
+  const names = [...new Set(S.moves.filter(m => m.musteri).map(m => m.musteri))].sort((x, y) => x.localeCompare(y, "tr"));
+  const dl = names.map(n => `<option value="${esc(n)}">`).join(""); if ($("#musteriList").innerHTML !== dl) $("#musteriList").innerHTML = dl;
   if (!g && F.newName) F.newName = "";
   const has = F.prod || F.newName;
   $("#pickWrap").hidden = !!has; $("#chosen").hidden = !has;
@@ -530,10 +568,12 @@ function renderForm() {
   const msg = $("#formMsg"); msg.hidden = true; msg.className = "note";
   if (raw !== null && isNaN(raw)) { msg.hidden = false; msg.classList.add("bad"); msg.textContent = "Fiyatı sadece rakamla yaz (ör. 12.500 veya 12500,50)."; }
   else if (!g && F.prod) { const n = stockOf(F.prod); if (adet > n) { msg.hidden = false; msg.classList.add("warn"); msg.textContent = `Stokta ${n} görünüyor, ${adet} düşüyorsun. Kaydedersen stok eksiye düşer; sayımı sonra düzeltebilirsin.`; } }
+  const ver = !g && F.ver, mus = $("#musteri").value.trim();
+  if (ver && raw === 0) { msg.hidden = false; msg.classList.add("warn"); msg.textContent = "Veresiye için satış fiyatı gir. Hediyeyse Peşin seç."; }
   const save = $("#save");
   save.className = "btn block " + (g ? "in" : "out");
-  save.textContent = g ? (adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : raw === 0 ? "Satışı kaydet · 0 ₺ (hediye)" : "Satışı kaydet");
-  save.disabled = S.readOnly || !db || !has || adet < 1 || (raw !== null && isNaN(raw)) || (!g && (raw === null || !(raw >= 0)));
+  save.textContent = g ? (adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : ver ? (toplam > 0 ? `Veresiye yaz · ${tl(toplam)}` : "Veresiye yaz") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : raw === 0 ? "Satışı kaydet · 0 ₺ (hediye)" : "Satışı kaydet");
+  save.disabled = S.readOnly || !db || !has || adet < 1 || (raw !== null && isNaN(raw)) || (!g && (raw === null || !(raw >= 0))) || (ver && (!mus || !(toplam > 0)));
 }
 
 $("#save").onclick = async () => {
@@ -545,11 +585,13 @@ $("#save").onclick = async () => {
       urunId = await api.addProduct({ad: F.newName.trim(), kategori: $("#np-kat").value, kasa: $("#np-kasa").value.trim(), konum: $("#np-konum").value.trim(), min: 1});
       S.products.set(urunId, {ad: F.newName.trim(), kategori: $("#np-kat").value, kasa: $("#np-kasa").value.trim(), konum: $("#np-konum").value.trim(), min: 1});
     }
-    const mv = {urunId, urunAd: pname(urunId), tip: F.tip, adet, birimFiyat: birim ?? 0, tarih: $("#tarih").value || today(), not: $("#not").value.trim(), ts: Date.now()};
+    const ver = F.tip === "cikis" && F.ver;
+    const mv = {urunId, urunAd: pname(urunId), tip: F.tip, adet, birimFiyat: birim ?? 0, tarih: $("#tarih").value || today(), not: $("#not").value.trim(), ts: Date.now(),
+      odeme: ver ? "veresiye" : "pesin", musteri: ver ? $("#musteri").value.trim().replace(/\s+/g, " ") : "", odendi: null};
     const mid = await api.addMove(mv);
     S.moves = [{...mv, id: mid, kim: me?.email || ""}, ...S.moves];
-    toast(`${F.tip === "giris" ? "Eklendi" : "Düşüldü"}: ${mv.urunAd} · ${adet} adet`, () => api.deleteMove(mid).then(reload));
-    F.prod = null; F.newName = ""; $("#adet").value = 1; $("#fiyat").value = ""; $("#not").value = "";
+    toast(ver ? `Veresiye: ${mv.musteri} · ${tl(adet * mv.birimFiyat)}` : `${F.tip === "giris" ? "Eklendi" : "Düşüldü"}: ${mv.urunAd} · ${adet} adet`, () => api.deleteMove(mid).then(reload));
+    F.prod = null; F.newName = ""; F.ver = false; $("#musteri").value = ""; $("#adet").value = 1; $("#fiyat").value = ""; $("#not").value = "";
     $("#np-kasa").value = ""; $("#np-konum").value = "";
     renderForm(); q.focus();
   } catch (e) { writeErr(e); renderForm(); }
@@ -572,8 +614,9 @@ function moveRow(m, withName = true) {
   const amt = m.tip === "cikis" ? tl(m.adet * m.birimFiyat) : m.tip === "giris" && m.birimFiyat ? tl(m.adet * m.birimFiyat) : "";
   const q = m.tip === "cikis" ? "−" + m.adet : (m.adet > 0 ? "+" : "") + m.adet;
   const confirming = pendingDel.has(m.id);
+  const tag = m.tip === "cikis" && m.odeme === "veresiye" ? (m.odendi ? `<em class="tag paid">Tahsil ${fmtDate(m.odendi)} · ${esc(m.musteri)}</em>` : `<em class="tag ver">Veresiye · ${esc(m.musteri)}</em>`) : "";
   return `<div class="li"><span class="pill ${cls}">${lbl}</span>
-    <span class="t"><b>${esc(withName ? pname(m.urunId) : (m.not || lbl))}</b><span>${fmtDate(m.tarih)}${withName && m.not ? " · " + esc(m.not) : ""}${m.kim ? " · " + esc(m.kim.split("@")[0]) : ""}</span></span>
+    <span class="t"><b>${esc(withName ? pname(m.urunId) : (m.not || lbl))}</b><span>${tag}${fmtDate(m.tarih)}${withName && m.not ? " · " + esc(m.not) : ""}${m.kim ? " · " + esc(m.kim.split("@")[0]) : ""}</span></span>
     <span class="r"><b>${q} ad.</b><span class="small muted num">${amt}</span>
       <span class="x">${confirming ? `<button class="btn sm danger" data-del="${esc(m.id)}">Evet, sil</button><button class="btn sm ghost" data-cancel="${esc(m.id)}">Vazgeç</button>` : `<button class="btn sm ghost" data-ask="${esc(m.id)}" aria-label="Hareketi sil">Sil</button>`}</span></span></div>`;
 }
@@ -707,12 +750,15 @@ function renderCiro() {
   let ciro = 0, adet = 0, kar = 0, karCiro = 0, noCost = 0;
   for (const m of sales) { const t = m.adet * m.birimFiyat; ciro += t; adet += m.adet; const c = ac.get(m.urunId); if (c != null) { kar += t - m.adet * c; karCiro += t; } else noCost++; }
   const alis = buys.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
+  const ov = openVer(), ovTot = ov.reduce((s, m) => s + m.adet * m.birimFiyat, 0), ovCust = new Set(ov.map(m => norm(m.musteri))).size;
+  const verIn = sales.filter(m => m.odeme === "veresiye" && !m.odendi).reduce((s, m) => s + m.adet * m.birimFiyat, 0);
   const go_ = `<svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
   $("#kpis").innerHTML = `
-    <button class="panel kpi lead" data-k="ciro" aria-label="Ciro detayı">${go_}<span>Ciro</span><b>${tl(ciro)}</b><small>${sales.length} satış</small></button>
+    <button class="panel kpi lead" data-k="ciro" aria-label="Ciro detayı">${go_}<span>Ciro</span><b>${tl(ciro)}</b><small>${sales.length} satış${verIn ? " · " + tl(verIn) + " veresiyede" : ""}</small></button>
     <button class="panel kpi" data-k="kar" aria-label="Brüt kâr detayı">${go_}<span>Brüt kâr</span><b>${karCiro ? tl(kar) : "—"}</b><small>${karCiro ? (noCost ? `${noCost} satışta alış fiyatı yok` : "ortalama alış fiyatına göre") : "alış fiyatı girilince görünür"}</small></button>
     <button class="panel kpi" data-k="adet" aria-label="Satılan adet detayı">${go_}<span>Satılan adet</span><b>${adet}</b><small>${sales.length ? "ort. satış " + tl(ciro / sales.length) : "&nbsp;"}</small></button>
-    <button class="panel kpi" data-k="alis" aria-label="Mal alımı detayı">${go_}<span>Mal alımı</span><b>${tl(alis)}</b><small>fiyatlı stok girişleri</small></button>`;
+    <button class="panel kpi" data-k="alis" aria-label="Mal alımı detayı">${go_}<span>Mal alımı</span><b>${tl(alis)}</b><small>fiyatlı stok girişleri</small></button>
+    <button class="panel kpi wide${ovTot ? " ver" : ""}" data-k="veresiye" aria-label="Veresiye detayı">${go_}<span>Veresiye · tahsil bekleyen</span><b>${tl(ovTot)}</b><small>${ov.length ? `${ovCust} müşteri · ${ov.length} satış · tüm tarihler` : "Açık veresiye yok"}</small></button>`;
   $("#kpis").querySelectorAll("[data-k]").forEach(b => b.onclick = () => openKpi(b.dataset.k));
   if (kpiOpen) openKpi(kpiOpen);
   renderChart(sales, a, b);
@@ -778,6 +824,26 @@ function openKpi(k) {
     body = arr.length ? arr.map(([id, o]) => `<div class="drow"><span class="n">${esc(pname(id))}</span>
       <span class="m">${o.n} satış · ort. ${tl(o.t / o.q)} · ${tl(o.t)}</span><span class="v">${o.q} ad.</span>
       <span class="track"><i style="width:${Math.max(3, o.q / max * 100)}%"></i></span></div>`).join("") : empty("Bu aralıkta satış yok.");
+  } else if (k === "veresiye") {
+    const ov = openVer().sort((x, y) => x.tarih.localeCompare(y.tarih) || x.ts - y.ts);
+    const g = new Map();
+    for (const m of ov) { const key = norm(m.musteri); const o = g.get(key) || {rows: [], t: 0}; o.ad = m.musteri; o.rows.push(m); o.t += m.adet * m.birimFiyat; g.set(key, o); }
+    const arr = [...g.values()].sort((x, y) => y.t - x.t);
+    const tot = ov.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
+    const gun = d => Math.max(0, Math.round((parseISO(today()) - parseISO(d)) / 864e5));
+    title = "Veresiye"; big = tl(tot);
+    stats = [["Müşteri", arr.length], ["Satış", ov.length], ["En eski", ov.length ? gun(ov[0].tarih) + " gün" : "—"]];
+    const paid = S.moves.filter(m => m.tip === "cikis" && m.odeme === "veresiye" && m.odendi).sort((x, y) => y.odendi.localeCompare(x.odendi) || y.ts - x.ts).slice(0, 30);
+    body = (arr.length ? arr.map(o => `<div class="vh"><b>${esc(o.ad)}</b><span class="num">${tl(o.t)}</span>
+        <button class="btn sm" data-pay="${esc(o.rows.map(m => m.id).join(","))}">${o.rows.length > 1 ? "Hepsi ödendi" : "Ödendi"}</button></div>`
+      + (o.rows.length > 1 ? o.rows.map(m => `<div class="drow"><span class="n">${esc(pname(m.urunId))}</span>
+        <span class="m">${fmtDate(m.tarih)} · ${m.adet} ad. × ${tl(m.birimFiyat)} · ${gun(m.tarih)} gün${kim(m)}</span>
+        <span class="v">${tl(m.adet * m.birimFiyat)}<button class="btn sm ghost" data-pay="${esc(m.id)}">Ödendi</button></span></div>`).join("")
+        : `<div class="drow"><span class="n">${esc(pname(o.rows[0].urunId))}</span><span class="m">${fmtDate(o.rows[0].tarih)} · ${o.rows[0].adet} ad. × ${tl(o.rows[0].birimFiyat)} · ${gun(o.rows[0].tarih)} gün${kim(o.rows[0])}</span></div>`)).join("")
+      : empty("Açık veresiye yok. Satış girerken “Veresiye” seçersen burada görünür."))
+      + (paid.length ? `<div class="dday"><span>Son tahsil edilenler</span><span></span></div>` + paid.map(m => `<div class="drow"><span class="n">${esc(m.musteri)} · ${esc(pname(m.urunId))}</span>
+        <span class="m">Satış ${fmtDate(m.tarih)} · tahsil ${fmtDate(m.odendi)}</span>
+        <span class="v">${tl(m.adet * m.birimFiyat)}<button class="btn sm ghost" data-unpay="${esc(m.id)}">Geri al</button></span></div>`).join("") : "");
   } else {
     const buys = S.moves.filter(m => m.tip === "giris" && inR(m) && m.birimFiyat > 0).sort(byNew);
     const tot = buys.reduce((s, m) => s + m.adet * m.birimFiyat, 0);
@@ -788,13 +854,22 @@ function openKpi(k) {
   }
   const keep = $("#dsc")?.scrollTop || 0, same = $("#dsc")?.dataset.k === k;
   $("#sheetHost").innerHTML = `<div class="scrim" id="dscrim"><div class="sheet dsheet" id="dsc" data-k="${k}" role="dialog" aria-modal="true" aria-label="${title} detayı">
-    <div class="dh"><div class="grab"></div><div class="dh-top"><div><span class="lbl">${title}</span><b class="big">${big}</b><div class="rng">${esc(rng)}</div></div>
+    <div class="dh"><div class="grab"></div><div class="dh-top"><div><span class="lbl">${title}</span><b class="big">${big}</b><div class="rng">${k === "veresiye" ? "Tüm tarihler · ödenmemiş satışlar" : esc(rng)}</div></div>
       <button class="btn ghost sm" id="dsx">Kapat</button></div>
       ${stats ? `<div class="dstats">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join("")}</div>` : ""}</div>
     <div class="dlist">${body}</div></div></div>`;
   if (same) $("#dsc").scrollTop = keep;
   $("#dscrim").onclick = e => { if (e.target.id === "dscrim") closeKpi(); };
   $("#dsx").onclick = closeKpi;
+  $("#dsc").querySelectorAll("[data-pay],[data-unpay]").forEach(b => b.onclick = () => { b.disabled = true; setPaid((b.dataset.pay || b.dataset.unpay).split(","), b.dataset.pay ? today() : null); });
+}
+async function setPaid(ids, d) {
+  try {
+    await api.setPaid(ids, d);
+    let t = 0; for (const m of S.moves) if (ids.includes(m.id)) { m.odendi = d; t += m.adet * m.birimFiyat; }
+    renderCiro(); renderRecent();
+    if (d) toast(`Tahsil edildi · ${tl(t)}`, () => api.setPaid(ids, null).then(reload)); else toast("Tekrar veresiyeye alındı");
+  } catch (e) { writeErr(e); renderCiro(); }
 }
 function renderChart(sales, a, b) {
   const da = parseISO(a), db_ = parseISO(b);
@@ -826,9 +901,9 @@ $("#csv").onclick = async () => {
   const rows = S.moves.filter(m => m.tarih >= a && m.tarih <= b).slice().sort((x, y) => x.tarih.localeCompare(y.tarih) || x.ts - y.ts);
   const cell = v => { v = String(v ?? ""); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const num = n => String(Math.round(n * 100) / 100).replace(".", ",");
-  const lines = [["Tarih", "Tip", "Ürün", "Kategori", "Kasa", "Adet", "Birim fiyat", "Tutar", "Not"].join(";")];
+  const lines = [["Tarih", "Tip", "Ürün", "Kategori", "Kasa", "Adet", "Birim fiyat", "Tutar", "Not", "Ödeme", "Müşteri", "Tahsil"].join(";")];
   for (const m of rows) { const p = S.products.get(m.urunId) || {};
-    lines.push([m.tarih, m.tip === "giris" ? "Giriş" : m.tip === "cikis" ? "Satış" : "Sayım", pname(m.urunId), p.kategori, p.kasa, m.tip === "cikis" ? -m.adet : m.adet, num(m.birimFiyat), num(m.adet * m.birimFiyat), m.not].map(cell).join(";")); }
+    lines.push([m.tarih, m.tip === "giris" ? "Giriş" : m.tip === "cikis" ? "Satış" : "Sayım", pname(m.urunId), p.kategori, p.kasa, m.tip === "cikis" ? -m.adet : m.adet, num(m.birimFiyat), num(m.adet * m.birimFiyat), m.not, m.tip === "cikis" ? (m.odeme === "veresiye" ? "Veresiye" : "Peşin") : "", m.musteri, m.odendi || ""].map(cell).join(";")); }
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type: "text/csv;charset=utf-8"});
   const a_ = document.createElement("a"); a_.href = URL.createObjectURL(blob); a_.download = `bk-stok-hareketler-${a}_${b}.csv`;
   document.body.appendChild(a_); a_.click(); a_.remove(); setTimeout(() => URL.revokeObjectURL(a_.href), 2000);
