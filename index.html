@@ -807,13 +807,13 @@ function openKpi(k) {
     const rows = sales.map(m => { const t = m.adet * m.birimFiyat, c = ac.get(m.urunId); const r = {m, t, c: c == null ? null : m.adet * c};
       if (r.c != null) { ciro += t; cost += r.c; kar += t - r.c; } return r; });
     title = "Brüt kâr"; big = ciro ? tl(kar) : "—";
-    stats = [["Ciro", tl(ciro)], ["Maliyet", tl(cost)], ["Marj", ciro ? pct(kar / ciro) : "—"]];
+    stats = [["Ciro", tl(ciro)], ["Maliyet", tl(cost)], ["Kâr oranı", cost ? pct(kar / cost) : "—"]];
     const miss = rows.filter(r => r.c == null).length;
     body = (miss ? `<div class="note warn" style="margin:12px 16px 0">${miss} satışta alış fiyatı yok; kâra katılmadı.</div>` : "")
       + (rows.length ? byDay(rows.map(r => Object.assign({}, r.m, {_r: r})), m => m._r.c == null ? 0 : m._r.t - m._r.c, m => { const r = m._r, p = r.c == null ? null : r.t - r.c;
         return `<div class="drow"><span class="n">${esc(pname(m.urunId))}</span>
         <span class="m">${tl(r.t)} satış − ${r.c == null ? "alış fiyatı yok" : tl(r.c) + " maliyet"}</span>
-        <span class="v ${p == null ? "" : p >= 0 ? "pos" : "neg"}">${p == null ? "—" : (p >= 0 ? "+" : "") + tl(p)}${p != null && r.t ? `<small>${pct(p / r.t)}</small>` : ""}</span></div>`; }) : empty("Bu aralıkta satış yok."));
+        <span class="v ${p == null ? "" : p >= 0 ? "pos" : "neg"}">${p == null ? "—" : (p >= 0 ? "+" : "") + tl(p)}${p != null && r.c > 0 ? `<small>${pct(p / r.c)}</small>` : ""}</span></div>`; }) : empty("Bu aralıkta satış yok."));
   } else if (k === "adet") {
     const g = new Map();
     for (const m of sales) { const o = g.get(m.urunId) || {q: 0, t: 0, n: 0}; o.q += m.adet; o.t += m.adet * m.birimFiyat; o.n++; g.set(m.urunId, o); }
