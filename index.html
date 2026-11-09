@@ -231,6 +231,7 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tag{display:inline-block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:1px}
 .tag.ver{background:var(--warn-soft);color:var(--warn)}
 .tag.paid{background:var(--in-soft);color:var(--in)}
+.mode button[data-y="1"][aria-pressed="true"]{background:var(--sunk);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .mode button[data-o="veresiye"][aria-pressed="true"]{background:var(--warn-soft);color:var(--warn)}
 .kpi.wide{grid-column:1/-1}
 .kpi.ver b{color:var(--warn)}
@@ -240,6 +241,9 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .vh b{flex:1;min-width:0;font-size:17px;font-weight:700;overflow-wrap:anywhere}
 .vh .num{font-family:var(--f-num);font-weight:600;color:var(--warn)}
 .vh+.drow{border-top:0}
+.tag.road{background:var(--sunk);color:var(--accent)}
+.yol .li .r .btn{margin-top:0}
+.yol .ph h3 b{color:var(--accent)}
 .drow .v .btn{display:flex;margin:6px 0 0 auto;border-color:var(--line)}
 .drow .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .drow .m{font-size:13px;color:var(--muted);grid-column:1}
@@ -304,6 +308,10 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
   <!-- HAREKET -->
   <section id="v-hareket" class="stack">
+    <div class="panel yol" id="yolPanel" hidden>
+      <div class="ph"><h3>Yolda <b id="yolCnt"></b></h3><span class="small muted">Sipariş verildi, ödendi · gelince stoğa ekle</span></div>
+      <div class="list" id="yolList"></div>
+    </div>
     <div class="mv">
       <div class="panel">
         <div class="form">
@@ -352,6 +360,17 @@ button.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
           </div>
 
           <div id="totalBox" class="total" hidden><span class="muted">Toplam</span><span class="num" id="totalVal">0 ₺</span></div>
+
+          <div id="durumBox" class="field">
+            <div class="row" style="justify-content:space-between">
+              <label>Durum</label>
+              <div class="mode" role="group" aria-label="Ürün geldi mi">
+                <button data-y="0" aria-pressed="true">Elimde</button>
+                <button data-y="1" aria-pressed="false">Yolda</button>
+              </div>
+            </div>
+            <div id="yoldaHint" class="small muted" hidden>Sipariş verildi, ödendi. Mal alımına bugün yazılır; stoğa ürün gelince “Geldi” deyince eklenir.</div>
+          </div>
 
           <div id="odemeBox" class="field" hidden>
             <div class="row" style="justify-content:space-between">
@@ -449,25 +468,28 @@ const norm = s => String(s || "").toLocaleLowerCase("tr-TR").normalize("NFD").re
 const sb = supabase.createClient(window.BK_CONFIG.url, window.BK_CONFIG.anonKey, {auth: {persistSession: true, autoRefreshToken: true}});
 let db = null, me = null;
 const toMove = r => ({id: r.id, urunId: r.urun_id, urunAd: r.urun_ad, tip: r.tip, adet: Number(r.adet) || 0, birimFiyat: Number(r.birim_fiyat) || 0, tarih: r.tarih, not: r.not_metni || "", ts: Number(r.ts) || 0, kim: r.kullanici || "",
-  odeme: r.odeme || "pesin", musteri: r.musteri || "", odendi: r.odendi || null});
+  odeme: r.odeme || "pesin", musteri: r.musteri || "", odendi: r.odendi || null, yolda: !!r.yolda, geldi: r.geldi || null});
 const api = {
   async addProduct(d) { const {data, error} = await sb.from("urunler").insert(d).select("id").single(); if (error) throw error; return data.id; },
   async updateProduct(id, d) { const {error} = await sb.from("urunler").update(d).eq("id", id); if (error) throw error; },
   async deleteProduct(id) { const {error} = await sb.from("urunler").delete().eq("id", id); if (error) throw error; },
-  async addMove(m) { const {data, error} = await sb.from("hareketler").insert({urun_id: m.urunId, urun_ad: m.urunAd, tip: m.tip, adet: m.adet, birim_fiyat: m.birimFiyat, tarih: m.tarih, not_metni: m.not, ts: m.ts, ...(m.odeme === "veresiye" ? {odeme: "veresiye", musteri: m.musteri} : {})}).select("id").single(); if (error) throw error; return data.id; },
+  async addMove(m) { const {data, error} = await sb.from("hareketler").insert({urun_id: m.urunId, urun_ad: m.urunAd, tip: m.tip, adet: m.adet, birim_fiyat: m.birimFiyat, tarih: m.tarih, not_metni: m.not, ts: m.ts, ...(m.odeme === "veresiye" ? {odeme: "veresiye", musteri: m.musteri} : {}), ...(m.yolda ? {yolda: true} : {})}).select("id").single(); if (error) throw error; return data.id; },
   async setPaid(ids, d) { const {error} = await sb.from("hareketler").update({odendi: d}).in("id", ids); if (error) throw error; },
+  async setArrived(ids, d) { const {error} = await sb.from("hareketler").update({yolda: !d, geldi: d}).in("id", ids); if (error) throw error; },
   async deleteMove(id) { const {error} = await sb.from("hareketler").delete().eq("id", id); if (error) throw error; },
 };
 const S = { products: new Map(), moves: [], loaded: {p: false, m: false}, readOnly: false };
-const F = { tip: "giris", prod: null, newName: "", mode: "birim", hl: -1, ver: false };
+const F = { tip: "giris", prod: null, newName: "", mode: "birim", hl: -1, ver: false, yol: false };
 let view = "hareket";
 
 /* ---------- derived ---------- */
-function stockOf(id) { let n = 0; for (const m of S.moves) if (m.urunId === id) n += m.tip === "giris" ? m.adet : m.tip === "cikis" ? -m.adet : m.adet; return n; }
-function stocks() { const map = new Map(); for (const m of S.moves) { const d = m.tip === "cikis" ? -m.adet : m.adet; map.set(m.urunId, (map.get(m.urunId) || 0) + d); } return map; }
+function stockOf(id) { let n = 0; for (const m of S.moves) if (m.urunId === id && !m.yolda) n += m.tip === "giris" ? m.adet : m.tip === "cikis" ? -m.adet : m.adet; return n; }
+function stocks() { const map = new Map(); for (const m of S.moves) { if (m.yolda) continue; const d = m.tip === "cikis" ? -m.adet : m.adet; map.set(m.urunId, (map.get(m.urunId) || 0) + d); } return map; }
 function avgCosts() { const a = new Map(); for (const m of S.moves) if (m.tip === "giris" && m.birimFiyat > 0) { const o = a.get(m.urunId) || {q: 0, t: 0}; o.q += m.adet; o.t += m.adet * m.birimFiyat; a.set(m.urunId, o); }
   const r = new Map(); a.forEach((o, k) => r.set(k, o.t / o.q)); return r; }
 const pname = id => S.products.get(id)?.ad || "(silinmiş ürün)";
+const onRoad = () => S.moves.filter(m => m.tip === "giris" && m.yolda);
+function roadMap() { const r = new Map(); for (const m of onRoad()) r.set(m.urunId, (r.get(m.urunId) || 0) + m.adet); return r; }
 const openVer = () => S.moves.filter(m => m.tip === "cikis" && m.odeme === "veresiye" && !m.odendi);
 function stockState(n, min) { if (n <= 0) return ["bad", "Yok"]; if (n <= (min || 1)) return ["warn", "Az"]; return ["ok", "Var"]; }
 
@@ -484,13 +506,14 @@ function go(v) {
 document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (["hareket","stok","ciro"].includes(h) && h !== view) go(h); });
 
-function render() { renderForm(); renderRecent(); if (view === "stok") renderStock(); if (view === "ciro") renderCiro(); }
+function render() { renderForm(); renderRoad(); renderRecent(); if (view === "stok") renderStock(); if (view === "ciro") renderCiro(); }
 
 /* ---------- hareket form ---------- */
 document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { F.tip = b.dataset.t; if (F.tip === "cikis" && !F.prod) { F.newName = ""; } renderForm(); });
 document.querySelectorAll(".mode button[data-m]").forEach(b => b.onclick = () => { F.mode = b.dataset.m; renderForm(); });
 document.querySelectorAll(".mode button[data-o]").forEach(b => b.onclick = () => { F.ver = b.dataset.o === "veresiye"; renderForm(); if (F.ver) $("#musteri").focus(); });
 $("#musteri").oninput = () => renderForm();
+document.querySelectorAll(".mode button[data-y]").forEach(b => b.onclick = () => { F.yol = b.dataset.y === "1"; renderForm(); });
 $("#minus").onclick = () => { $("#adet").value = Math.max(1, (parseInt($("#adet").value) || 1) - 1); renderForm(); };
 $("#plus").onclick = () => { $("#adet").value = (parseInt($("#adet").value) || 0) + 1; renderForm(); };
 $("#adet").oninput = $("#fiyat").oninput = () => renderForm();
@@ -546,6 +569,8 @@ function renderForm() {
   document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === F.tip));
   document.querySelectorAll(".mode button[data-m]").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === F.mode));
   document.querySelectorAll(".mode button[data-o]").forEach(b => b.setAttribute("aria-pressed", (b.dataset.o === "veresiye") === F.ver));
+  document.querySelectorAll(".mode button[data-y]").forEach(b => b.setAttribute("aria-pressed", (b.dataset.y === "1") === F.yol));
+  $("#durumBox").hidden = !g; $("#yoldaHint").hidden = !g || !F.yol;
   $("#odemeBox").hidden = g; $("#musteriBox").hidden = g || !F.ver;
   const names = [...new Set(S.moves.filter(m => m.musteri).map(m => m.musteri))].sort((x, y) => x.localeCompare(y, "tr"));
   const dl = names.map(n => `<option value="${esc(n)}">`).join(""); if ($("#musteriList").innerHTML !== dl) $("#musteriList").innerHTML = dl;
@@ -572,7 +597,7 @@ function renderForm() {
   if (ver && raw === 0) { msg.hidden = false; msg.classList.add("warn"); msg.textContent = "Veresiye için satış fiyatı gir. Hediyeyse Peşin seç."; }
   const save = $("#save");
   save.className = "btn block " + (g ? "in" : "out");
-  save.textContent = g ? (adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : ver ? (toplam > 0 ? `Veresiye yaz · ${tl(toplam)}` : "Veresiye yaz") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : raw === 0 ? "Satışı kaydet · 0 ₺ (hediye)" : "Satışı kaydet");
+  save.textContent = g ? (F.yol ? `${adet} adet yolda olarak kaydet` : adet > 1 ? `${adet} adet stoğa ekle` : "Stoğa ekle") : ver ? (toplam > 0 ? `Veresiye yaz · ${tl(toplam)}` : "Veresiye yaz") : (toplam > 0 ? `Satışı kaydet · ${tl(toplam)}` : raw === 0 ? "Satışı kaydet · 0 ₺ (hediye)" : "Satışı kaydet");
   save.disabled = S.readOnly || !db || !has || adet < 1 || (raw !== null && isNaN(raw)) || (!g && (raw === null || !(raw >= 0))) || (ver && (!mus || !(toplam > 0)));
 }
 
@@ -587,11 +612,12 @@ $("#save").onclick = async () => {
     }
     const ver = F.tip === "cikis" && F.ver;
     const mv = {urunId, urunAd: pname(urunId), tip: F.tip, adet, birimFiyat: birim ?? 0, tarih: $("#tarih").value || today(), not: $("#not").value.trim(), ts: Date.now(),
-      odeme: ver ? "veresiye" : "pesin", musteri: ver ? $("#musteri").value.trim().replace(/\s+/g, " ") : "", odendi: null};
+      odeme: ver ? "veresiye" : "pesin", musteri: ver ? $("#musteri").value.trim().replace(/\s+/g, " ") : "", odendi: null,
+      yolda: F.tip === "giris" && F.yol, geldi: null};
     const mid = await api.addMove(mv);
     S.moves = [{...mv, id: mid, kim: me?.email || ""}, ...S.moves];
-    toast(ver ? `Veresiye: ${mv.musteri} · ${tl(adet * mv.birimFiyat)}` : `${F.tip === "giris" ? "Eklendi" : "Düşüldü"}: ${mv.urunAd} · ${adet} adet`, () => api.deleteMove(mid).then(reload));
-    F.prod = null; F.newName = ""; F.ver = false; $("#musteri").value = ""; $("#adet").value = 1; $("#fiyat").value = ""; $("#not").value = "";
+    toast(ver ? `Veresiye: ${mv.musteri} · ${tl(adet * mv.birimFiyat)}` : mv.yolda ? `Yolda: ${mv.urunAd} · ${adet} adet` : `${F.tip === "giris" ? "Eklendi" : "Düşüldü"}: ${mv.urunAd} · ${adet} adet`, () => api.deleteMove(mid).then(reload));
+    F.prod = null; F.newName = ""; F.ver = false; F.yol = false; $("#musteri").value = ""; $("#adet").value = 1; $("#fiyat").value = ""; $("#not").value = "";
     $("#np-kasa").value = ""; $("#np-konum").value = "";
     renderForm(); q.focus();
   } catch (e) { writeErr(e); renderForm(); }
@@ -614,7 +640,7 @@ function moveRow(m, withName = true) {
   const amt = m.tip === "cikis" ? tl(m.adet * m.birimFiyat) : m.tip === "giris" && m.birimFiyat ? tl(m.adet * m.birimFiyat) : "";
   const q = m.tip === "cikis" ? "−" + m.adet : (m.adet > 0 ? "+" : "") + m.adet;
   const confirming = pendingDel.has(m.id);
-  const tag = m.tip === "cikis" && m.odeme === "veresiye" ? (m.odendi ? `<em class="tag paid">Tahsil ${fmtDate(m.odendi)} · ${esc(m.musteri)}</em>` : `<em class="tag ver">Veresiye · ${esc(m.musteri)}</em>`) : "";
+  const tag = m.tip === "giris" && m.yolda ? `<em class="tag road">Yolda</em>` : m.tip === "giris" && m.geldi ? `<em class="tag paid">Geldi ${fmtDate(m.geldi)}</em>` : m.tip === "cikis" && m.odeme === "veresiye" ? (m.odendi ? `<em class="tag paid">Tahsil ${fmtDate(m.odendi)} · ${esc(m.musteri)}</em>` : `<em class="tag ver">Veresiye · ${esc(m.musteri)}</em>`) : "";
   return `<div class="li"><span class="pill ${cls}">${lbl}</span>
     <span class="t"><b>${esc(withName ? pname(m.urunId) : (m.not || lbl))}</b><span>${tag}${fmtDate(m.tarih)}${withName && m.not ? " · " + esc(m.not) : ""}${m.kim ? " · " + esc(m.kim.split("@")[0]) : ""}</span></span>
     <span class="r"><b>${q} ad.</b><span class="small muted num">${amt}</span>
@@ -625,6 +651,24 @@ function bindMoveButtons(root, rerender) {
   root.querySelectorAll("[data-cancel]").forEach(b => b.onclick = () => { pendingDel.delete(b.dataset.cancel); rerender(); });
   root.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { const id = b.dataset.del; pendingDel.delete(id);
     try { await api.deleteMove(id); await reload(); toast("Hareket silindi"); } catch (e) { writeErr(e); } });
+}
+function renderRoad() {
+  const rows = onRoad().sort((x, y) => x.tarih.localeCompare(y.tarih) || x.ts - y.ts);
+  $("#yolPanel").hidden = !rows.length;
+  if (!rows.length) return;
+  const gun = d => Math.max(0, Math.round((parseISO(today()) - parseISO(d)) / 864e5));
+  $("#yolCnt").textContent = `· ${rows.reduce((s, m) => s + m.adet, 0)} adet`;
+  $("#yolList").innerHTML = rows.map(m => `<div class="li"><span class="pill adj">Yolda</span>
+    <span class="t"><b>${esc(pname(m.urunId))}</b><span>${m.adet} adet · ${fmtDate(m.tarih)} sipariş · ${gun(m.tarih) ? gun(m.tarih) + " gündür yolda" : "bugün"}${m.birimFiyat ? " · " + tl(m.adet * m.birimFiyat) : ""}</span></span>
+    <span class="r"><button class="btn sm in" data-arr="${esc(m.id)}">Geldi, stoğa ekle</button></span></div>`).join("");
+  $("#yolList").querySelectorAll("[data-arr]").forEach(b => b.onclick = async () => {
+    b.disabled = true; const id = b.dataset.arr, d = today();
+    try {
+      await api.setArrived([id], d);
+      const m = S.moves.find(x => x.id === id); if (m) { m.yolda = false; m.geldi = d; }
+      render(); toast(`Stoğa eklendi: ${m ? pname(m.urunId) + " · " + m.adet + " adet" : ""}`, () => api.setArrived([id], null).then(reload));
+    } catch (e) { writeErr(e); b.disabled = false; }
+  });
 }
 function renderRecent() {
   const box = $("#recent");
@@ -642,8 +686,8 @@ let katFilter = "Tümü", searchText = "";
 $("#search").oninput = e => { searchText = e.target.value; renderStock(); };
 $("#addProd").onclick = () => openProduct(null);
 function renderStock() {
-  const st = stocks();
-  const all = [...S.products.entries()].map(([id, p]) => ({id, p, n: st.get(id) || 0}));
+  const st = stocks(), rd = roadMap();
+  const all = [...S.products.entries()].map(([id, p]) => ({id, p, n: st.get(id) || 0, y: rd.get(id) || 0}));
   $("#s-cesit").textContent = all.length;
   $("#s-adet").textContent = all.reduce((a, x) => a + Math.max(0, x.n), 0);
   $("#s-az").textContent = all.filter(x => x.n <= (x.p.min || 1)).length;
@@ -659,8 +703,8 @@ function renderStock() {
   if (!S.loaded.p) { box.innerHTML = `<div class="empty">Yükleniyor…</div>`; return; }
   if (!all.length) { box.innerHTML = `<div class="empty"><b>Ürün listesi boş</b>“Gir / Düş” ekranında ürün adını yazıp stok girdiğinde burada görünür. İstersen “Yeni ürün” ile önce listeyi kurabilirsin.</div>`; return; }
   if (!rows.length) { box.innerHTML = `<div class="empty">Bu filtrede ürün yok.</div>`; return; }
-  box.innerHTML = rows.map(({id, p, n}) => { const [c, l] = stockState(n, p.min);
-    return `<button class="prod" data-id="${esc(id)}"><span style="min-width:0"><b>${esc(p.ad)}</b><span class="meta">${esc([p.kasa, p.kategori, p.konum && "Raf " + p.konum].filter(Boolean).join(" · "))}</span></span>
+  box.innerHTML = rows.map(({id, p, n, y}) => { const [c, l] = stockState(n, p.min);
+    return `<button class="prod" data-id="${esc(id)}"><span style="min-width:0"><b>${esc(p.ad)}</b><span class="meta">${y ? `<em class="tag road">+${y} yolda</em>` : ""}${esc([p.kasa, p.kategori, p.konum && "Raf " + p.konum].filter(Boolean).join(" · "))}</span></span>
       <span class="qty"><span class="pill ${c}">${l}</span><span class="n">${n}</span></span></button>`; }).join("");
   box.querySelectorAll(".prod").forEach(b => b.onclick = () => openProduct(b.dataset.id));
 }
@@ -678,7 +722,7 @@ function openProduct(id) {
   const ac = id ? avgCosts().get(id) : null;
   $("#sheetHost").innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ürün">
     <div class="sheet-h"><h2>${id ? esc(p.ad) : "Yeni ürün"}</h2><button class="btn ghost sm" id="sx">Kapat</button></div>
-    ${id ? `<div class="row" style="justify-content:space-between"><div class="bigq"><span class="num">${n}</span><span class="muted">adet stokta</span></div>
+    ${id ? `<div class="row" style="justify-content:space-between"><div class="bigq"><span class="num">${n}</span><span class="muted">adet stokta${roadMap().get(id) ? ` · <span class="tag road">+${roadMap().get(id)} yolda</span>` : ""}</span></div>
       <div class="row"><button class="btn in sm" id="sg">＋ Gir</button><button class="btn out sm" id="sd">− Düş</button></div></div>
       ${ac ? `<div class="small muted">Ortalama alış: <span class="num">${tl(ac)}</span></div>` : ""}` : ""}
     <div class="field"><label for="e-ad">Ürün adı</label><input id="e-ad" class="inp" value="${esc(p.ad)}"></div>
@@ -850,7 +894,7 @@ function openKpi(k) {
     title = "Mal alımı"; big = tl(tot);
     stats = [["Giriş", buys.length], ["Adet", buys.reduce((s, m) => s + m.adet, 0)], ["Ürün çeşidi", new Set(buys.map(m => m.urunId)).size]];
     body = buys.length ? byDay(buys, m => m.adet * m.birimFiyat, m => `<div class="drow"><span class="n">${esc(pname(m.urunId))}</span>
-      <span class="m">${m.adet} ad. × ${tl(m.birimFiyat)}${m.not ? " · " + esc(m.not) : ""}</span><span class="v">${tl(m.adet * m.birimFiyat)}</span></div>`) : empty("Bu aralıkta fiyatlı stok girişi yok.");
+      <span class="m">${m.yolda ? `<em class="tag road">Yolda</em>` : ""}${m.adet} ad. × ${tl(m.birimFiyat)}${m.not ? " · " + esc(m.not) : ""}</span><span class="v">${tl(m.adet * m.birimFiyat)}</span></div>`) : empty("Bu aralıkta fiyatlı stok girişi yok.");
   }
   const keep = $("#dsc")?.scrollTop || 0, same = $("#dsc")?.dataset.k === k;
   $("#sheetHost").innerHTML = `<div class="scrim" id="dscrim"><div class="sheet dsheet" id="dsc" data-k="${k}" role="dialog" aria-modal="true" aria-label="${title} detayı">
@@ -901,9 +945,9 @@ $("#csv").onclick = async () => {
   const rows = S.moves.filter(m => m.tarih >= a && m.tarih <= b).slice().sort((x, y) => x.tarih.localeCompare(y.tarih) || x.ts - y.ts);
   const cell = v => { v = String(v ?? ""); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const num = n => String(Math.round(n * 100) / 100).replace(".", ",");
-  const lines = [["Tarih", "Tip", "Ürün", "Kategori", "Kasa", "Adet", "Birim fiyat", "Tutar", "Not", "Ödeme", "Müşteri", "Tahsil"].join(";")];
+  const lines = [["Tarih", "Tip", "Ürün", "Kategori", "Kasa", "Adet", "Birim fiyat", "Tutar", "Not", "Ödeme", "Müşteri", "Tahsil", "Geliş"].join(";")];
   for (const m of rows) { const p = S.products.get(m.urunId) || {};
-    lines.push([m.tarih, m.tip === "giris" ? "Giriş" : m.tip === "cikis" ? "Satış" : "Sayım", pname(m.urunId), p.kategori, p.kasa, m.tip === "cikis" ? -m.adet : m.adet, num(m.birimFiyat), num(m.adet * m.birimFiyat), m.not, m.tip === "cikis" ? (m.odeme === "veresiye" ? "Veresiye" : "Peşin") : "", m.musteri, m.odendi || ""].map(cell).join(";")); }
+    lines.push([m.tarih, m.tip === "giris" ? "Giriş" : m.tip === "cikis" ? "Satış" : "Sayım", pname(m.urunId), p.kategori, p.kasa, m.tip === "cikis" ? -m.adet : m.adet, num(m.birimFiyat), num(m.adet * m.birimFiyat), m.not, m.tip === "cikis" ? (m.odeme === "veresiye" ? "Veresiye" : "Peşin") : "", m.musteri, m.odendi || "", m.tip === "giris" ? (m.yolda ? "Yolda" : m.geldi || "") : ""].map(cell).join(";")); }
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type: "text/csv;charset=utf-8"});
   const a_ = document.createElement("a"); a_.href = URL.createObjectURL(blob); a_.download = `bk-stok-hareketler-${a}_${b}.csv`;
   document.body.appendChild(a_); a_.click(); a_.remove(); setTimeout(() => URL.revokeObjectURL(a_.href), 2000);
